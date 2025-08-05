@@ -11,16 +11,26 @@ const upload = multer({ dest: "uploads/" });
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
 const MODEL_VERSION_ID = process.env.MODEL_VERSION_ID;
 
+console.log("REPLICATE_API_TOKEN:", REPLICATE_API_TOKEN ? "Set" : "Not Set");
+console.log("MODEL_VERSION_ID:", MODEL_VERSION_ID ? "Set" : "Not Set");
+
+
 app.use(express.static("public"));
 
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
+  console.log("Received /generate-image request");
   try {
-    // Create FormData and append file stream (use fs.createReadStream for multer saved file)
-    const form = new FormData();
-    form.append("file", fs.createReadStream(req.file.path), req.file.originalname);
+    if (!req.file) {
+      console.error("No file uploaded");
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+    console.log("Uploaded file info:", req.file);
 
+    // Upload to tmpfiles
+    const form = new FormData();
+    form.append("file", req.file.buffer || require("fs").createReadStream(req.file.path), req.file.originalname);
+
+    console.log("Uploading to tmpfiles.org...");
     const uploadResp = await fetch("https://tmpfiles.org/api/v1/upload", {
       method: "POST",
       body: form,
@@ -28,14 +38,15 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     });
 
     const uploadData = await uploadResp.json();
+    console.log("Tmpfiles response:", uploadResp.status, uploadData);
 
     if (!uploadResp.ok || !uploadData.url) {
+      console.error("Tmpfiles upload failed");
       return res.status(500).json({ error: "Failed to upload image to tmpfiles" });
     }
 
-    console.log("Tmpfiles URL:", uploadData.url);
-
-    // Call Replicate with uploaded image URL and prompt text
+    // Call replicate
+    console.log("Calling replicate API...");
     const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
@@ -52,18 +63,20 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     });
 
     const replicateData = await replicateResp.json();
-    console.log("Replicate API response:", replicateData);
+    console.log("Replicate API response:", replicateResp.status, replicateData);
 
     if (!replicateData.id) {
+      console.error("No prediction ID returned");
       return res.status(500).json({ error: "No prediction ID returned from Replicate", details: replicateData });
     }
 
     res.json({ prediction: { id: replicateData.id } });
   } catch (error) {
-    console.error("Image generation error:", error);
-    res.status(500).json({ error: "Failed to generate image", details: error.message || error.toString() });
+    console.error("Error in /generate-image:", error);
+    res.status(500).json({ error: "Failed to generate image" });
   }
 });
+
 
 app.get("/prediction-status/:id", async (req, res) => {
   try {
@@ -81,4 +94,5 @@ app.get("/prediction-status/:id", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
 
