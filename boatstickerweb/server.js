@@ -9,7 +9,9 @@ const upload = multer({ dest: "uploads/" });
 
 // Env vars (set in Render)
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
-const MODEL_VERSION_ID = process.env.MODEL_VERSION_ID || "54a0e1e1841cbb8c4ef226bd5e197798bef44acd0f63ed38338bda222205a7b0"; // Flux Schnell fallback
+const MODEL_VERSION_ID =
+  process.env.MODEL_VERSION_ID ||
+  "54a0e1e1841cbb8c4ef226bd5e197798bef44acd0f63ed38338bda222205a7b0"; // Flux Schnell
 
 app.use(express.static("public"));
 
@@ -38,14 +40,14 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       return res.status(500).json({ error: "No URL returned from tmpfiles" });
     }
 
-    // Convert to direct /dl/ link
-    const imageUrl = uploadData.data.url.replace(
-      "tmpfiles.org/",
-      "tmpfiles.org/dl/"
-    );
+    // Ensure correct /dl/ direct link
+    let imageUrl = uploadData.data.url;
+    if (!imageUrl.includes("/dl/")) {
+      imageUrl = imageUrl.replace("tmpfiles.org/", "tmpfiles.org/dl/");
+    }
     console.log("🔗 Direct image URL for AI:", imageUrl);
 
-    // Call Replicate with Flux Schnell
+    // Call Replicate
     console.log(`🚀 Calling Replicate model version: ${MODEL_VERSION_ID}`);
     const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
@@ -56,7 +58,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       body: JSON.stringify({
         version: MODEL_VERSION_ID,
         input: {
-          prompt: "technical line drawing, sketch style of this boat",
+          prompt: "technical line drawing, sketch style of a fishing boat",
           image: imageUrl,
         },
       }),
