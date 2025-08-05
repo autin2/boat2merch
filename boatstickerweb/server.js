@@ -14,7 +14,7 @@ const MODEL_VERSION_ID = process.env.MODEL_VERSION_ID;
 
 app.use(express.static("public"));
 
-app.post("/generate-image", upload.none(), async (req, res) => {
+app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   try {
     // Since this model doesn't accept an image input, only prompt:
     const prompt =
@@ -69,3 +69,4 @@ app.get("/prediction-status/:id", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
