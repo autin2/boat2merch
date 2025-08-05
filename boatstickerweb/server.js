@@ -61,7 +61,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     res.json({ prediction: { id: replicateData.id } });
   } catch (error) {
     console.error("Image generation error:", error);
-    res.status(500).json({ error: "Failed to generate image" });
+    res.status(500).json({ error: "Failed to generate image", details: error.message || error.toString() });
   }
 });
 
@@ -81,3 +81,4 @@ app.get("/prediction-status/:id", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
