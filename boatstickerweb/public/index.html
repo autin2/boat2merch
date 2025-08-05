@@ -36,8 +36,6 @@
   </section>
 
 <script>
-  console.log("Script loaded and running");
-
   const uploadBtn = document.getElementById("uploadBtn");
   const boatUpload = document.getElementById("boatUpload");
 
@@ -45,9 +43,7 @@
   resultContainer.style.marginTop = "20px";
   document.querySelector(".hero").appendChild(resultContainer);
 
-  uploadBtn.addEventListener("click", () => {
-    boatUpload.click();
-  });
+  uploadBtn.addEventListener("click", () => boatUpload.click());
 
   boatUpload.addEventListener("change", async () => {
     if (boatUpload.files.length === 0) return;
@@ -59,59 +55,54 @@
     formData.append("boatImage", file);
 
     try {
-      // Upload image and start prediction
+      // Start prediction
       const uploadResp = await fetch("/generate-image", {
         method: "POST",
         body: formData,
       });
 
-      if (!uploadResp.ok) {
-        throw new Error("Upload failed");
-      }
+      if (!uploadResp.ok) throw new Error("Upload failed");
 
       const { prediction } = await uploadResp.json();
-      console.log("Prediction response:", prediction);
       const predictionId = prediction?.id;
-      console.log("Prediction ID:", predictionId);
+      if (!predictionId) throw new Error("No prediction ID returned");
 
-      // Poll backend for prediction status
-      const pollInterval = 2000; // 2 seconds
-      const maxPollAttempts = 30;
+      // Poll function
+      const pollInterval = 2000; // ms
+      const maxAttempts = 30;
       let attempts = 0;
 
-      async function pollPrediction() {
+      async function poll() {
         attempts++;
         const statusResp = await fetch(`/prediction-status/${predictionId}`);
         const statusData = await statusResp.json();
 
         if (statusData.status === "succeeded" && statusData.output?.length) {
-          const outputUrl = statusData.output[0];
+          const imageUrl = statusData.output[0];
           resultContainer.innerHTML = `
-            <p>Here’s your AI-generated drawing:</p>
-            <img src="${outputUrl}" alt="AI generated boat drawing" style="max-width:100%; border-radius:8px;"/>
-            <br />
-            <a href="${outputUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
+            <p>Your AI-generated drawing:</p>
+            <img src="${imageUrl}" alt="AI generated boat drawing" style="max-width:100%; border-radius:8px;" />
+            <br/>
+            <a href="${imageUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
           `;
         } else if (statusData.status === "failed") {
           resultContainer.innerHTML = `<p>AI generation failed. Please try again.</p>`;
         } else {
-          if (attempts < maxPollAttempts) {
-            setTimeout(pollPrediction, pollInterval);
+          if (attempts < maxAttempts) {
+            setTimeout(poll, pollInterval);
           } else {
             resultContainer.innerHTML = `<p>Generation timed out. Please try again later.</p>`;
           }
         }
       }
 
-      pollPrediction();
-
+      poll();
     } catch (error) {
       console.error(error);
       resultContainer.innerHTML = `<p>Error: ${error.message}</p>`;
     }
   });
 </script>
-
 
   <!-- Features -->
   <section class="features">
@@ -143,4 +134,5 @@
 
 </body>
 </html>
+
 
