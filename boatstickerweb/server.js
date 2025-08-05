@@ -49,14 +49,15 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        version: MODEL_VERSION_ID,
-        input: {
-          image: { uri: imageUrl }, // correct schema
-          prompt: "technical line drawing, sketch style of a fishing boat",
-          strength: 0.75,
-          scheduler: "K_EULER",
-        },
-      }),
+  version: MODEL_VERSION_ID,
+  input: {
+    image: { uri: imageUrl },
+    text: "technical line drawing, sketch style of a fishing boat",
+    strength: 0.75,
+    scheduler: "K_EULER"
+  },
+}),
+
     });
 
     const replicateData = await replicateResp.json();
@@ -93,3 +94,4 @@ app.get("/prediction-status/:id", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
