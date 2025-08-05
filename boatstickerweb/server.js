@@ -58,7 +58,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       body: JSON.stringify({
         version: MODEL_VERSION_ID,
         input: {
-          prompt: "a picture in black and white lineart in the style of TOK",
+          prompt: "a picture in black and white lineart of the boat provided in the image",
           image: imageUrl,
         },
       }),
@@ -98,6 +98,7 @@ app.get("/prediction-status/:id", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
 
 
 
