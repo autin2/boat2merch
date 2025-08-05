@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Turn your boat into a custom sticker, shirt, or any print-on-demand item using AI." />
+  <meta name="keywords" content="boat sticker, boat shirt, custom boat print, AI boat art, personalized boat merchandise" />
+  <meta name="author" content="Your Brand Name" />
+  <title>Boat2Merch - Turn Your Boat into Stickers & Shirts</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="logo">🚤 Boat2Merch</div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="how-it-works.html">How It Works</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="examples.html">Examples</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <h1>Turn Your Boat into Custom Stickers, Shirts & More</h1>
+    <p>Upload your boat photo and let our AI create unique designs for print-on-demand merchandise.</p>
+
+    <!-- Hidden file input -->
+    <input type="file" id="boatUpload" accept="image/*" style="display: none;" />
+
+    <!-- Upload button -->
+    <button class="btn-primary" id="uploadBtn">Upload Your Boat</button>
+  </section>
+
+  <script>
+    console.log("Script loaded and running");
+
+    const uploadBtn = document.getElementById("uploadBtn");
+    const boatUpload = document.getElementById("boatUpload");
+
+    const resultContainer = document.createElement("div");
+    resultContainer.style.marginTop = "20px";
+    document.querySelector(".hero").appendChild(resultContainer);
+
+    uploadBtn.addEventListener("click", () => {
+      boatUpload.click();
+    });
+
+    boatUpload.addEventListener("change", async () => {
+      if (boatUpload.files.length === 0) return;
+
+      const file = boatUpload.files[0];
+      resultContainer.innerHTML = `<p>Uploading and generating image for <strong>${file.name}</strong>... Please wait.</p>`;
+
+      const formData = new FormData();
+      formData.append("boatImage", file);
+
+      try {
+        // Upload image and start prediction
+        const uploadResp = await fetch("/generate-image", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!uploadResp.ok) {
+          throw new Error("Upload failed");
+        }
+
+        const { prediction } = await uploadResp.json();
+        console.log("Prediction response:", prediction);
+        const predictionId = prediction?.id;
+        console.log("Prediction ID:", predictionId);
+
+        // Poll backend for prediction status
+        const pollInterval = 2000; // 2 seconds
+        const maxPollAttempts = 30;
+        let attempts = 0;
+
+        async function pollPrediction() {
+          attempts++;
+          const statusResp = await fetch(`/prediction-status/${predictionId}`);
+          const statusData = await statusResp.json();
+
+          if (statusData.status === "succeeded") {
+            const outputUrl = statusData.output[0];
+            resultContainer.innerHTML = `
+              <p>Here’s your AI-generated drawing:</p>
+              <img src="${outputUrl}" alt="AI generated boat drawing" style="max-width:100%; border-radius:8px;"/>
+              <br />
+              <a href="${outputUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
+            `;
+          } else if (statusData.status === "failed") {
+            resultContainer.innerHTML = `<p>AI generation failed. Please try again.</p>`;
+          } else {
+            if (attempts < maxPollAttempts) {
+              setTimeout(pollPrediction, pollInterval);
+            } else {
+              resultContainer.innerHTML = `<p>Generation timed out. Please try again later.</p>`;
+            }
+          }
+        }
+
+        pollPrediction();
+
+      } catch (error) {
+        console.error(error);
+        resultContainer.innerHTML = `<p>Error: ${error.message}</p>`;
+      }
+    });
+  </script>
+
+  <!-- Features -->
+  <section class="features">
+    <div class="feature">
+      <h2>🎨 AI-Powered Art</h2>
+      <p>We transform your boat photo into stunning artwork perfect for merchandise.</p>
+    </div>
+    <div class="feature">
+      <h2>🛍 Print-On-Demand</h2>
+      <p>Order stickers, shirts, mugs, and more — no minimum quantity.</p>
+    </div>
+    <div class="feature">
+      <h2>⚡ Fast & Easy</h2>
+      <p>Upload your photo, choose your style, and get your product.</p>
+    </div>
+  </section>
+
+  <!-- Call to Action -->
+  <section class="cta">
+    <h2>Get Started Today</h2>
+    <p>Your boat deserves to be more than just a photo.</p>
+    <button class="btn-secondary">Start Now</button>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2025 Boat2Merch | All rights reserved.</p>
+  </footer>
+
+</body>
+</html>
