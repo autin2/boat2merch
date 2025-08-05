@@ -11,7 +11,7 @@ const upload = multer({ dest: "uploads/" });
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
 const MODEL_VERSION_ID =
   process.env.MODEL_VERSION_ID ||
-  "54a0e1e1841cbb8c4ef226bd5e197798bef44acd0f63ed38338bda222205a7b0"; // Flux Schnell
+  "3cfd38225f82f47062567c783c555c97ac2669868b0c9a5002e14fe88cdde319"; // cuupid 
 
 app.use(express.static("public"));
 
@@ -58,7 +58,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       body: JSON.stringify({
         version: MODEL_VERSION_ID,
         input: {
-          prompt: "Convert only the boat in the provided image into a clean, detailed technical line drawing in sketch style. Remove background, water, and any other objects.",
+          prompt: "Create a precise, clean technical line drawing of the boat in the input image only. Remove all background, water, sky, people, and any other objects. Focus entirely on the boat’s exact shape and details without adding or altering any parts. No extra elements or decorations. No color or shading, pure black lines on white background. Maintain the boat’s exact proportions and contours.",
           image: imageUrl,
         },
       }),
@@ -98,4 +98,5 @@ app.get("/prediction-status/:id", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
 
