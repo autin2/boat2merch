@@ -58,7 +58,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       body: JSON.stringify({
         version: MODEL_VERSION_ID,
         input: {
-          prompt: "Create a precise, clean technical line drawing of the boat in the input image only. Remove all background, water, sky, people, and any other objects. Focus entirely on the boat’s exact shape and details without adding or altering any parts. No extra elements or decorations. No color or shading, pure black lines on white background. Maintain the boat’s exact proportions and contours.",
+          prompt: "a picture in black and white lineart in the style of TOK",
           image: imageUrl,
         },
       }),
@@ -98,5 +98,6 @@ app.get("/prediction-status/:id", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
 
 
