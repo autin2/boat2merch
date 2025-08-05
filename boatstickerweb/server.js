@@ -58,7 +58,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       body: JSON.stringify({
         version: MODEL_VERSION_ID,
         input: {
-          prompt: "technical line drawing, sketch style of a fishing boat",
+          prompt: "Convert only the boat in the provided image into a clean, detailed technical line drawing in sketch style. Remove background, water, and any other objects.",
           image: imageUrl,
         },
       }),
@@ -98,3 +98,4 @@ app.get("/prediction-status/:id", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
