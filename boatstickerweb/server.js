@@ -11,10 +11,10 @@ const app = express();
 const upload = multer({ dest: "uploads/" });
 
 // Your Replicate API key
-const REPLICATE_API_TOKEN = "r8_9zFV4eQvZtMpMDhGgtGxP4PN5YWbzjx0P6xHf";
+const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
 
 // Model version ID from your example
-const MODEL_VERSION_ID = "54a0e1e1841cbb8c4ef226bd5e197798bef44acd0f63ed38338bda222205a7b0";
+const MODEL_VERSION_ID = process.env.MODEL_VERSION_ID;
 
 app.use(express.static("public"));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -73,3 +73,4 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+
