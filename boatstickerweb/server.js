@@ -2,6 +2,7 @@ import express from "express";
 import multer from "multer";
 import fetch from "node-fetch";
 import FormData from "form-data";
+import fs from "fs";
 
 const app = express();
 const upload = multer({ dest: "uploads/" });
@@ -16,9 +17,9 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
   try {
-    // Upload file to tmpfiles.org
+    // Create FormData and append file stream (use fs.createReadStream for multer saved file)
     const form = new FormData();
-    form.append("file", req.file.buffer || require("fs").createReadStream(req.file.path), req.file.originalname);
+    form.append("file", fs.createReadStream(req.file.path), req.file.originalname);
 
     const uploadResp = await fetch("https://tmpfiles.org/api/v1/upload", {
       method: "POST",
