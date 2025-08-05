@@ -7,19 +7,20 @@ import fs from "fs";
 const app = express();
 const upload = multer({ dest: "uploads/" });
 
+// Env vars (set in Render)
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
 const MODEL_VERSION_ID = process.env.MODEL_VERSION_ID;
 
 app.use(express.static("public"));
 
-// Upload & generate image
+// Route: Upload & generate image
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
   try {
     console.log("Received file:", req.file);
 
-    // Upload file to tmpfiles.org
+    // Upload to tmpfiles.org
     const form = new FormData();
     form.append("file", fs.createReadStream(req.file.path), req.file.originalname);
 
@@ -40,7 +41,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     const imageUrl = uploadData.data.url;
     console.log("Tmpfiles URL:", imageUrl);
 
-    // Call Replicate - using stable-diffusion-img2img
+    // Call Replicate with correct schema for img2img
     const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
@@ -50,9 +51,9 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       body: JSON.stringify({
         version: MODEL_VERSION_ID,
         input: {
-          image: imageUrl, // uploaded boat image
+          image: { uri: imageUrl }, // correct schema
           prompt: "technical line drawing, sketch style of a fishing boat",
-          strength: 0.75, // how much to change from original (0-1)
+          strength: 0.75,
           scheduler: "K_EULER",
         },
       }),
@@ -62,7 +63,10 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     console.log("Replicate API response:", replicateData);
 
     if (!replicateData.id) {
-      return res.status(500).json({ error: "No prediction ID returned from Replicate" });
+      return res.status(500).json({
+        error: "No prediction ID returned from Replicate",
+        details: replicateData,
+      });
     }
 
     res.json({ prediction: { id: replicateData.id } });
@@ -72,7 +76,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   }
 });
 
-// Check prediction status
+// Route: Check prediction status
 app.get("/prediction-status/:id", async (req, res) => {
   try {
     const predictionId = req.params.id;
