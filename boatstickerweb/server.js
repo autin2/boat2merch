@@ -1,54 +1,27 @@
 import express from "express";
 import multer from "multer";
 import fetch from "node-fetch";
-import FormData from "form-data";
-import fs from "fs";
 
 const app = express();
 const upload = multer({ dest: "uploads/" });
 
-// Env vars (set in Render)
+// Env vars on Render:
+// REPLICATE_API_TOKEN = your replicate token
+// MODEL_VERSION_ID = version ID of openai/gpt-image-1 (get from https://replicate.com/openai/gpt-image-1)
+
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
-const MODEL_VERSION_ID =
-  process.env.MODEL_VERSION_ID ||
-  "3cfd38225f82f47062567c783c555c97ac2669868b0c9a5002e14fe88cdde319"; // cuupid 
+const MODEL_VERSION_ID = process.env.MODEL_VERSION_ID;
 
 app.use(express.static("public"));
 
-// Upload & generate image
-app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
+app.post("/generate-image", upload.none(), async (req, res) => {
   try {
-    console.log("📂 Received file:", req.file);
+    // Since this model doesn't accept an image input, only prompt:
+    const prompt =
+      "A precise black and white line drawing of a fishing boat, technical sketch style, no background, clean lines";
 
-    // Upload to tmpfiles.org
-    const form = new FormData();
-    form.append("file", fs.createReadStream(req.file.path), req.file.originalname);
-
-    console.log("⬆️ Uploading file to tmpfiles.org...");
-    const uploadResp = await fetch("https://tmpfiles.org/api/v1/upload", {
-      method: "POST",
-      body: form,
-      headers: form.getHeaders(),
-    });
-
-    const uploadData = await uploadResp.json();
-    console.log("📦 Tmpfiles response:", uploadData);
-
-    if (!uploadData?.data?.url) {
-      return res.status(500).json({ error: "No URL returned from tmpfiles" });
-    }
-
-    // Ensure correct /dl/ direct link
-    let imageUrl = uploadData.data.url;
-    if (!imageUrl.includes("/dl/")) {
-      imageUrl = imageUrl.replace("tmpfiles.org/", "tmpfiles.org/dl/");
-    }
-    console.log("🔗 Direct image URL for AI:", imageUrl);
-
-    // Call Replicate
     console.log(`🚀 Calling Replicate model version: ${MODEL_VERSION_ID}`);
+
     const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
@@ -58,8 +31,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       body: JSON.stringify({
         version: MODEL_VERSION_ID,
         input: {
-          prompt: "a picture in black and white lineart of the boat provided in the image",
-          image: imageUrl,
+          prompt,
         },
       }),
     });
@@ -81,7 +53,6 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   }
 });
 
-// Poll prediction status
 app.get("/prediction-status/:id", async (req, res) => {
   try {
     const predictionId = req.params.id;
@@ -98,7 +69,3 @@ app.get("/prediction-status/:id", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
-
-
-
-
