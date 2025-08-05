@@ -7,7 +7,6 @@ import fs from "fs";
 const app = express();
 const upload = multer({ dest: "uploads/" });
 
-// Env vars
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
 const MODEL_VERSION_ID = process.env.MODEL_VERSION_ID;
 
@@ -34,14 +33,13 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     console.log("Tmpfiles response:", uploadData);
 
     if (!uploadData?.data?.url) {
-      console.error("No URL returned from tmpfiles upload", uploadData);
       return res.status(500).json({ error: "No URL returned from tmpfiles" });
     }
 
     const imageUrl = uploadData.data.url;
     console.log("Tmpfiles URL:", imageUrl);
 
-    // Call Replicate with uploaded image URL and prompt text
+    // Call Replicate to create prediction
     const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
@@ -61,7 +59,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     console.log("Replicate API response:", replicateData);
 
     if (!replicateData.id) {
-      return res.status(500).json({ error: "No prediction ID returned from Replicate", details: replicateData });
+      return res.status(500).json({ error: "No prediction ID returned from Replicate" });
     }
 
     res.json({ prediction: { id: replicateData.id } });
