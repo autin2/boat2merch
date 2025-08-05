@@ -3,7 +3,6 @@ import multer from "multer";
 import fetch from "node-fetch";
 import path from "path";
 import { fileURLToPath } from "url";
-import FormData from "form-data"; // install this: npm install form-data
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,6 +10,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const upload = multer({ dest: "uploads/" });
 
+// Use environment variables for secrets
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
 const MODEL_VERSION_ID = process.env.MODEL_VERSION_ID;
 
@@ -22,24 +22,13 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   }
 
   try {
-    // 1. Upload file to tmpfiles.org
-    const form = new FormData();
-    form.append("file", path.join(__dirname, "uploads", req.file.filename), req.file.originalname);
+    // You can upload the file to a temporary hosting service here or serve locally if accessible publicly
+    // For example, using your own server URL (adjust as necessary)
+    const imageUrl = `http://your-public-domain-or-ngrok-url/uploads/${req.file.filename}`;
 
-    const tmpResp = await fetch("https://tmpfiles.org/api/v1/upload", {
-      method: "POST",
-      body: form,
-    });
+    console.log("Tmpfiles URL:", imageUrl);
 
-    const tmpData = await tmpResp.json();
-    if (!tmpData || !tmpData.data || !tmpData.data.url) {
-      throw new Error("Failed to upload to tmpfiles.org");
-    }
-    const publicFileUrl = tmpData.data.url;
-    console.log("Tmpfiles URL:", publicFileUrl);
-
-    // 2. Send to Replicate API
-    const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
+    const response = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
         Authorization: `Token ${REPLICATE_API_TOKEN}`,
@@ -48,28 +37,26 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       body: JSON.stringify({
         version: MODEL_VERSION_ID,
         input: {
-          image: publicFileUrl,
-          // add seed here if you want reproducibility, e.g. seed: 42
+          image: imageUrl,
+          text: "technical line drawing, sketch style of a fishing boat"
         },
       }),
     });
 
-    const replicateData = await replicateResp.json();
-    console.log("Replicate API response:", replicateData);
+    const data = await response.json();
+    console.log("Replicate API response:", data);
 
-    if (!replicateData.id) {
-      return res.status(500).json({ error: "No prediction ID returned from Replicate", details: replicateData });
+    if (!data.id) {
+      return res.status(500).json({ error: "No prediction ID returned from Replicate", details: data });
     }
 
-    // 3. Return prediction ID to frontend
-    res.json({ prediction: { id: replicateData.id } });
+    res.json({ prediction: { id: data.id } });
   } catch (error) {
-    console.error("Error during generate-image:", error);
-    res.status(500).json({ error: error.message || "Failed to generate image" });
+    console.error("Image generation error:", error);
+    res.status(500).json({ error: "Failed to generate image" });
   }
 });
 
-// Poll prediction status endpoint remains unchanged, here for completeness:
 app.get("/prediction-status/:id", async (req, res) => {
   try {
     const predictionId = req.params.id;
