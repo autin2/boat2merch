@@ -39,7 +39,8 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   }
 
   try {
-    const imageUrl = `http://localhost:3000/uploads/${req.file.filename}`;
+    const imageUrl = `https://your-domain.com/uploads/${req.file.filename}`;
+
     console.log("Uploaded image URL:", imageUrl);
 
     const response = await fetch("https://api.replicate.com/v1/predictions", {
@@ -73,4 +74,5 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+
 
