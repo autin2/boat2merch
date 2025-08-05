@@ -9,22 +9,22 @@ const upload = multer({ dest: "uploads/" });
 
 // Env vars (set in Render)
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
-const MODEL_VERSION_ID = process.env.MODEL_VERSION_ID;
+const MODEL_VERSION_ID = process.env.MODEL_VERSION_ID || "54a0e1e1841cbb8c4ef226bd5e197798bef44acd0f63ed38338bda222205a7b0"; // Flux Schnell fallback
 
 app.use(express.static("public"));
 
-// Route: Upload & generate image
+// Upload & generate image
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
   try {
-    console.log("Received file:", req.file);
+    console.log("📂 Received file:", req.file);
 
     // Upload to tmpfiles.org
     const form = new FormData();
     form.append("file", fs.createReadStream(req.file.path), req.file.originalname);
 
-    console.log("Uploading file to tmpfiles.org...");
+    console.log("⬆️ Uploading file to tmpfiles.org...");
     const uploadResp = await fetch("https://tmpfiles.org/api/v1/upload", {
       method: "POST",
       body: form,
@@ -32,16 +32,21 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     });
 
     const uploadData = await uploadResp.json();
-    console.log("Tmpfiles response:", uploadData);
+    console.log("📦 Tmpfiles response:", uploadData);
 
     if (!uploadData?.data?.url) {
       return res.status(500).json({ error: "No URL returned from tmpfiles" });
     }
 
-    const imageUrl = uploadData.data.url;
-    console.log("Tmpfiles URL:", imageUrl);
+    // Convert to direct /dl/ link
+    const imageUrl = uploadData.data.url.replace(
+      "tmpfiles.org/",
+      "tmpfiles.org/dl/"
+    );
+    console.log("🔗 Direct image URL for AI:", imageUrl);
 
-    // Call Replicate with correct schema for img2img
+    // Call Replicate with Flux Schnell
+    console.log(`🚀 Calling Replicate model version: ${MODEL_VERSION_ID}`);
     const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
@@ -49,19 +54,16 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-  version: MODEL_VERSION_ID,
-  input: {
-    prompt: "technical line drawing, sketch style of this boat",
-    image: imageUrl
-  }
-}),
-
-
-
+        version: MODEL_VERSION_ID,
+        input: {
+          prompt: "technical line drawing, sketch style of this boat",
+          image: imageUrl,
+        },
+      }),
     });
 
     const replicateData = await replicateResp.json();
-    console.log("Replicate API response:", replicateData);
+    console.log("🖼 Replicate API response:", replicateData);
 
     if (!replicateData.id) {
       return res.status(500).json({
@@ -72,12 +74,12 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
 
     res.json({ prediction: { id: replicateData.id } });
   } catch (error) {
-    console.error("Image generation error:", error);
+    console.error("❌ Image generation error:", error);
     res.status(500).json({ error: "Failed to generate image" });
   }
 });
 
-// Route: Check prediction status
+// Poll prediction status
 app.get("/prediction-status/:id", async (req, res) => {
   try {
     const predictionId = req.params.id;
@@ -87,14 +89,10 @@ app.get("/prediction-status/:id", async (req, res) => {
     const statusData = await statusResp.json();
     res.json(statusData);
   } catch (error) {
-    console.error("Prediction status error:", error);
+    console.error("❌ Prediction status error:", error);
     res.status(500).json({ error: "Failed to get prediction status" });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
-
-
-
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
