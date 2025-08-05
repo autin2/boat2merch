@@ -51,12 +51,13 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       body: JSON.stringify({
   version: MODEL_VERSION_ID,
   input: {
-    image: { uri: imageUrl },
+    image: imageUrl, // just the URL string
     text: "technical line drawing, sketch style of a fishing boat",
     strength: 0.75,
     scheduler: "K_EULER"
   },
 }),
+
 
     });
 
@@ -94,4 +95,5 @@ app.get("/prediction-status/:id", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
 
