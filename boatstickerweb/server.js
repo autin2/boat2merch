@@ -12,6 +12,7 @@ const MODEL_VERSION_ID = process.env.MODEL_VERSION_ID;
 
 app.use(express.static("public"));
 
+// Upload & generate image
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
@@ -39,7 +40,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     const imageUrl = uploadData.data.url;
     console.log("Tmpfiles URL:", imageUrl);
 
-    // Call Replicate to create prediction
+    // Call Replicate - using stable-diffusion-img2img
     const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
@@ -49,8 +50,10 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       body: JSON.stringify({
         version: MODEL_VERSION_ID,
         input: {
-          image: imageUrl,
-          text: "technical line drawing, sketch style of a fishing boat"
+          image: imageUrl, // uploaded boat image
+          prompt: "technical line drawing, sketch style of a fishing boat",
+          strength: 0.75, // how much to change from original (0-1)
+          scheduler: "K_EULER",
         },
       }),
     });
@@ -69,6 +72,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   }
 });
 
+// Check prediction status
 app.get("/prediction-status/:id", async (req, res) => {
   try {
     const predictionId = req.params.id;
