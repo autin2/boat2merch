@@ -2,156 +2,320 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Edit Sticker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Edit Your Boat Design</title>
   <style>
     body {
-      font-family: sans-serif;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
       margin: 0;
-      background: #f5f5f5;
+      padding: 20px;
     }
 
-    .toolbar {
-      background: #333;
-      padding: 10px;
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .toolbar button {
-      padding: 8px 12px;
-      background: #2196f3;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .canvas {
-      position: relative;
+    .editor-container {
+      max-width: 900px;
       margin: 0 auto;
-      width: 100%;
-      height: 90vh;
-      background: white;
-      border-top: 2px solid #ccc;
-      overflow: hidden;
+      text-align: center;
     }
 
-    .canvas img {
+    #canvas {
+      position: relative;
+      display: inline-block;
+      border: 2px dashed #aaa;
+      margin-top: 20px;
+      background-color: white;
+      padding: 10px;
+      user-select: none;
+    }
+
+    #canvas img {
       max-width: 100%;
-      height: auto;
       display: block;
+      user-select: none;
+      pointer-events: none; /* so text boxes get events */
+    }
+
+    .controls {
+      margin-bottom: 20px;
+    }
+
+    .controls button {
+      background: #2196f3;
+      color: #fff;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 4px;
+      margin: 0 8px 8px 0;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .controls button:hover {
+      background: #1976d2;
     }
 
     .text-box {
       position: absolute;
-      padding: 4px 6px;
+      font-size: 24px;
+      font-family: Arial, sans-serif;
+      color: black;
       background: transparent;
-      border: 1px dashed transparent;
-      outline: none;
       cursor: move;
-      font-size: 20px;
       user-select: text;
+      padding: 4px 8px;
       white-space: pre;
+      border: 1px dashed transparent;
+      min-width: 50px;
+      min-height: 30px;
+      box-sizing: border-box;
+      overflow: visible;
+    }
+
+    .text-box:focus {
+      outline: none;
     }
 
     .text-box.selected {
       border: 1px dashed #2196f3;
     }
+
+    /* Resize handles */
+    .resize-handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: #2196f3;
+      border: 1px solid white;
+      box-sizing: border-box;
+      border-radius: 2px;
+      cursor: pointer;
+      z-index: 10;
+    }
+    .resize-handle.nw { top: -5px; left: -5px; cursor: nwse-resize; }
+    .resize-handle.ne { top: -5px; right: -5px; cursor: nesw-resize; }
+    .resize-handle.sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
+    .resize-handle.se { bottom: -5px; right: -5px; cursor: nwse-resize; }
   </style>
 </head>
 <body>
-  <div class="toolbar">
-    <button id="addText">Add Text</button>
+
+<div class="editor-container">
+  <div class="controls">
+    <button id="addTextBtn">Add Text</button>
   </div>
 
-  <div class="canvas" id="canvas">
-    <img id="preview" src="" alt="Editable Image" />
+  <div class="editor-canvas" id="canvas">
+    <img id="preview" src="" alt="AI-generated boat image" />
+    <div class="bottom-buttons">
+      <button onclick="alert('Sticker purchase flow here')">Buy as Sticker</button>
+      <button onclick="alert('Shirt purchase flow here')">Buy as Shirt</button>
+      <button onclick="alert('Mug purchase flow here')">Buy as Mug</button>
+    </div>
   </div>
+</div>
 
-  <script>
-    const canvas = document.getElementById("canvas");
-    const preview = document.getElementById("preview");
-    const addTextButton = document.getElementById("addText");
+<script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const imgSrc = urlParams.get("img");
 
-    let addingText = false;
-    let selectedBox = null;
-    let offsetX = 0;
-    let offsetY = 0;
+  const canvas = document.getElementById("canvas");
+  const previewImage = document.getElementById("preview");
+  const addTextBtn = document.getElementById("addTextBtn");
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const img = urlParams.get("img");
-    if (!img) {
-      document.body.innerHTML = "<p style='text-align:center;'>Image not found. Go back and generate one first.</p>";
-    } else {
-      preview.src = img;
-    }
+  if (!imgSrc) {
+    document.body.innerHTML = "<p style='text-align:center;'>Image not found. Please go back and generate an image first.</p>";
+  } else {
+    previewImage.src = imgSrc;
+  }
 
-    function deselectAll() {
-      document.querySelectorAll(".text-box").forEach(box => box.classList.remove("selected"));
-      selectedBox = null;
-    }
+  let addingText = false;
+  let selectedBox = null;
+  let offsetX, offsetY;
 
-    function selectBox(box) {
-      deselectAll();
-      box.classList.add("selected");
-      selectedBox = box;
-    }
+  addTextBtn.addEventListener("click", () => {
+    addingText = true;
+    document.body.style.cursor = "text";
+  });
 
-    addTextButton.addEventListener("click", () => {
-      addingText = true;
-      document.body.style.cursor = "text";
-    });
+  canvas.addEventListener("click", (e) => {
+    if (addingText) {
+      const box = document.createElement("div");
+      box.className = "text-box";
+      box.contentEditable = true;
+      box.innerText = "Edit me";
 
-    canvas.addEventListener("click", (e) => {
-      if (addingText) {
-        const box = document.createElement("div");
-        box.className = "text-box";
-        box.contentEditable = true;
-        box.innerText = "Text";
+      const rect = canvas.getBoundingClientRect();
+      box.style.left = `${e.clientX - rect.left}px`;
+      box.style.top = `${e.clientY - rect.top}px`;
 
-        const rect = canvas.getBoundingClientRect();
-        box.style.left = `${e.clientX - rect.left}px`;
-        box.style.top = `${e.clientY - rect.top}px`;
+      // Make sure box has initial width and height for resizing
+      box.style.width = '150px';
+      box.style.height = 'auto';
 
-        box.addEventListener("mousedown", (e) => {
-          if (!box.classList.contains("selected")) {
-            selectBox(box);
-          }
-          offsetX = e.offsetX;
-          offsetY = e.offsetY;
-        });
-
-        box.addEventListener("click", (e) => {
-          selectBox(box);
-          e.stopPropagation();
-        });
-
-        canvas.appendChild(box);
+      box.addEventListener("mousedown", (e) => {
+        if (e.target.classList.contains('resize-handle')) {
+          // resizing handled separately
+          return;
+        }
+        selectedBox = box;
+        offsetX = e.offsetX;
+        offsetY = e.offsetY;
+        document.body.style.cursor = "move";
         selectBox(box);
-        box.focus();
+        e.stopPropagation();
+      });
 
-        addingText = false;
-        document.body.style.cursor = "default";
-      } else {
+      box.addEventListener("click", (e) => {
+        selectBox(box);
+        e.stopPropagation();
+      });
+
+      canvas.appendChild(box);
+      selectBox(box);
+      box.focus();
+
+      addingText = false;
+      document.body.style.cursor = "default";
+    } else {
+      if (!e.target.classList.contains("text-box") && !e.target.classList.contains("resize-handle")) {
         deselectAll();
       }
-    });
+    }
+  });
 
-    document.addEventListener("mousemove", (e) => {
-      if (selectedBox && e.buttons === 1) {
-        const canvasRect = canvas.getBoundingClientRect();
-        selectedBox.style.left = `${e.clientX - canvasRect.left - offsetX}px`;
-        selectedBox.style.top = `${e.clientY - canvasRect.top - offsetY}px`;
-      }
-    });
+  document.addEventListener("mousemove", (e) => {
+    if (selectedBox && e.buttons === 1 && !isResizing) {
+      const rect = canvas.getBoundingClientRect();
+      selectedBox.style.left = `${e.clientX - rect.left - offsetX}px`;
+      selectedBox.style.top = `${e.clientY - rect.top - offsetY}px`;
+    }
+  });
 
-    document.addEventListener("click", (e) => {
-      if (!e.target.classList.contains("text-box")) {
-        deselectAll();
-      }
+  document.addEventListener("mouseup", () => {
+    selectedBox = null;
+    isResizing = false;
+    document.body.style.cursor = "default";
+  });
+
+  function deselectAll() {
+    const boxes = document.querySelectorAll(".text-box");
+    boxes.forEach((box) => {
+      box.classList.remove("selected");
+      removeResizeHandles(box);
     });
-  </script>
+    selectedBox = null;
+  }
+
+  function selectBox(box) {
+    deselectAll();
+    selectedBox = box;
+    box.classList.add("selected");
+    addResizeHandles(box);
+  }
+
+  // Resize handle logic
+  let isResizing = false;
+  let currentHandle = null;
+  let startX, startY, startWidth, startHeight, startLeft, startTop;
+
+  function addResizeHandles(box) {
+    removeResizeHandles(box);
+
+    const handles = ['nw', 'ne', 'sw', 'se'];
+    handles.forEach(pos => {
+      const handle = document.createElement('div');
+      handle.className = `resize-handle ${pos}`;
+      box.appendChild(handle);
+
+      handle.addEventListener('mousedown', e => {
+        e.stopPropagation();
+        isResizing = true;
+        currentHandle = pos;
+        startX = e.clientX;
+        startY = e.clientY;
+
+        const style = window.getComputedStyle(box);
+        startWidth = parseInt(style.width, 10);
+        startHeight = parseInt(style.height, 10);
+        startLeft = parseInt(style.left, 10);
+        startTop = parseInt(style.top, 10);
+
+        document.body.style.cursor = handle.style.cursor;
+
+        document.addEventListener('mousemove', resizeMouseMove);
+        document.addEventListener('mouseup', resizeMouseUp);
+      });
+    });
+  }
+
+  function removeResizeHandles(box) {
+    const handles = box.querySelectorAll('.resize-handle');
+    handles.forEach(h => h.remove());
+  }
+
+  function resizeMouseMove(e) {
+    if (!isResizing || !selectedBox) return;
+
+    let dx = e.clientX - startX;
+    let dy = e.clientY - startY;
+
+    let newWidth = startWidth;
+    let newHeight = startHeight;
+    let newLeft = startLeft;
+    let newTop = startTop;
+
+    switch(currentHandle) {
+      case 'nw':
+        newWidth = startWidth - dx;
+        newHeight = startHeight - dy;
+        newLeft = startLeft + dx;
+        newTop = startTop + dy;
+        break;
+      case 'ne':
+        newWidth = startWidth + dx;
+        newHeight = startHeight - dy;
+        newTop = startTop + dy;
+        break;
+      case 'sw':
+        newWidth = startWidth - dx;
+        newHeight = startHeight + dy;
+        newLeft = startLeft + dx;
+        break;
+      case 'se':
+        newWidth = startWidth + dx;
+        newHeight = startHeight + dy;
+        break;
+    }
+
+    // Apply min sizes
+    if (newWidth < 30) {
+      newWidth = 30;
+      if (currentHandle === 'nw' || currentHandle === 'sw') {
+        newLeft = startLeft + (startWidth - 30);
+      }
+    }
+    if (newHeight < 20) {
+      newHeight = 20;
+      if (currentHandle === 'nw' || currentHandle === 'ne') {
+        newTop = startTop + (startHeight - 20);
+      }
+    }
+
+    selectedBox.style.width = newWidth + "px";
+    selectedBox.style.height = newHeight + "px";
+    selectedBox.style.left = newLeft + "px";
+    selectedBox.style.top = newTop + "px";
+  }
+
+  function resizeMouseUp() {
+    isResizing = false;
+    currentHandle = null;
+    document.body.style.cursor = "default";
+    document.removeEventListener('mousemove', resizeMouseMove);
+    document.removeEventListener('mouseup', resizeMouseUp);
+  }
+
+</script>
+
 </body>
 </html>
