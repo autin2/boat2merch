@@ -26,13 +26,14 @@
       background-color: white;
       padding: 10px;
       user-select: none;
+      min-height: 400px;
     }
 
     #canvas img {
       max-width: 100%;
       display: block;
       user-select: none;
-      pointer-events: none; /* so text boxes get events */
+      pointer-events: none;
     }
 
     .controls {
@@ -42,6 +43,7 @@
       flex-wrap: wrap;
       justify-content: center;
       align-items: center;
+      position: relative;
     }
 
     .controls label {
@@ -52,8 +54,7 @@
 
     .controls select,
     .controls input[type="number"],
-    .controls input[type="color"],
-    .controls button {
+    .controls input[type="color"] {
       padding: 8px 10px;
       border-radius: 4px;
       border: 1px solid #ccc;
@@ -70,15 +71,44 @@
       box-shadow: 0 0 5px #2196f3;
     }
 
-    .controls button {
+    #addTextBtn {
       background-color: #2196f3;
       color: white;
       border: none;
       user-select: none;
+      padding: 8px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      order: -1; /* Move to left */
     }
 
-    .controls button:hover {
+    #addTextBtn:hover {
       background-color: #1976d2;
+    }
+
+    .trash-can {
+      position: absolute;
+      left: 10px;
+      top: 50px;
+      width: 50px;
+      height: 50px;
+      background: #e74c3c;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+      user-select: none;
+      transition: background 0.3s;
+    }
+    .trash-can.drag-over {
+      background: #c0392b;
+    }
+
+    .trash-can svg {
+      width: 24px;
+      height: 24px;
+      fill: white;
     }
 
     .text-box {
@@ -128,6 +158,8 @@
 
 <div class="editor-container">
   <div class="controls">
+    <button id="addTextBtn" title="Add Text (Click, then click canvas)">Add Text</button>
+
     <label for="fontSelect">Font:</label>
     <select id="fontSelect" aria-label="Font Family">
       <option value="Arial" selected>Arial</option>
@@ -143,7 +175,10 @@
     <label for="textColor">Color:</label>
     <input id="textColor" type="color" value="#000000" aria-label="Text Color" />
 
-    <button id="addTextBtn">Add Text</button>
+    <div class="trash-can" id="trashCan" title="Drag text box here to delete">
+      <!-- simple trash can SVG icon -->
+      <svg viewBox="0 0 24 24"><path d="M3 6h18v2H3V6zm2 3h14v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9zm5 3v6h2v-6H10zm4 0v6h2v-6h-2z"/></svg>
+    </div>
   </div>
 
   <div class="editor-canvas" id="canvas">
@@ -166,6 +201,7 @@
   const fontSelect = document.getElementById("fontSelect");
   const fontSizeInput = document.getElementById("fontSize");
   const textColorInput = document.getElementById("textColor");
+  const trashCan = document.getElementById("trashCan");
 
   if (!imgSrc) {
     document.body.innerHTML = "<p style='text-align:center;'>Image not found. Please go back and generate an image first.</p>";
@@ -176,6 +212,10 @@
   let addingText = false;
   let selectedBox = null;
   let offsetX, offsetY;
+  let draggedBox = null;
+  let isResizing = false;
+  let currentHandle = null;
+  let startX, startY, startWidth, startHeight, startLeft, startTop;
 
   addTextBtn.addEventListener("click", () => {
     addingText = true;
@@ -189,7 +229,6 @@
       box.contentEditable = true;
       box.innerText = "Edit me";
 
-      // Apply chosen font, size and color
       box.style.fontFamily = fontSelect.value;
       box.style.fontSize = fontSizeInput.value + "px";
       box.style.color = textColorInput.value;
@@ -198,13 +237,31 @@
       box.style.left = `${e.clientX - rect.left}px`;
       box.style.top = `${e.clientY - rect.top}px`;
 
-      // Initial size
       box.style.width = "150px";
       box.style.height = "auto";
 
+      box.setAttribute('draggable', true);
+
+      // Drag start
+      box.addEventListener("dragstart", e => {
+        draggedBox = box;
+        // create a drag image so the cursor stays correct
+        const crt = box.cloneNode(true);
+        crt.style.position = "absolute";
+        crt.style.top = "-1000px";
+        document.body.appendChild(crt);
+        e.dataTransfer.setDragImage(crt, e.offsetX, e.offsetY);
+        setTimeout(() => document.body.removeChild(crt), 0);
+      });
+
+      // Drag end
+      box.addEventListener("dragend", e => {
+        draggedBox = null;
+      });
+
       box.addEventListener("mousedown", (e) => {
         if (e.target.classList.contains('resize-handle')) {
-          return; // resize handled separately
+          return;
         }
         selectedBox = box;
         offsetX = e.offsetX;
@@ -241,6 +298,23 @@
   });
 
   document.addEventListener("mouseup", () => {
+    if (selectedBox && draggedBox === selectedBox) {
+      // Check if dropped inside trash can
+      const trashRect = trashCan.getBoundingClientRect();
+      const boxRect = selectedBox.getBoundingClientRect();
+
+      if (
+        boxRect.left < trashRect.right &&
+        boxRect.right > trashRect.left &&
+        boxRect.top < trashRect.bottom &&
+        boxRect.bottom > trashRect.top
+      ) {
+        selectedBox.remove();
+        draggedBox = null;
+        selectedBox = null;
+        document.body.style.cursor = "default";
+      }
+    }
     selectedBox = null;
     isResizing = false;
     document.body.style.cursor = "default";
@@ -263,10 +337,6 @@
   }
 
   // Resize handle logic
-  let isResizing = false;
-  let currentHandle = null;
-  let startX, startY, startWidth, startHeight, startLeft, startTop;
-
   function addResizeHandles(box) {
     removeResizeHandles(box);
 
@@ -335,7 +405,6 @@
         break;
     }
 
-    // Apply min sizes
     if (newWidth < 30) {
       newWidth = 30;
       if (currentHandle === 'nw' || currentHandle === 'sw') {
