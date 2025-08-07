@@ -237,3 +237,18 @@ nav a.active {
 .contact-form button:hover {
   background: #e68900;
 }
+
+.btn-sticker {
+  background: #4caf50;
+  color: #fff;
+  padding: 12px 25px;
+  border: none;
+  font-size: 1em;
+  cursor: pointer;
+  border-radius: 6px;
+  margin-top: 10px;
+}
+
+.btn-sticker:hover {
+  background: #43a047;
+}
