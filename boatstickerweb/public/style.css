@@ -18,6 +18,37 @@ header {
   font-weight: bold;
 }
 
+.result-container {
+  max-width: 450px;       /* bigger than loading-container */
+  min-height: 450px;      /* taller */
+  margin: 20px auto;
+  padding: 20px;
+  background: #2c2c2c;    /* match loading container */
+  border-radius: 8px;
+  box-shadow: 0 0 12px #ff9800;
+  color: #ffb347;
+  font-weight: 600;
+  text-align: center;
+}
+
+.result-container p {
+  margin: 10px 0;
+}
+
+.result-container .ai-output {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow:
+    0 0 14px rgba(255, 152, 0, 0.9),
+    0 0 24px rgba(255, 152, 0, 0.7);
+  transition: box-shadow 0.3s ease-in-out;
+  display: block;
+  margin: 20px auto;
+}
+
+
+
 nav a {
   color: #ccc;
   text-decoration: none;
@@ -368,5 +399,6 @@ nav a.active {
   pointer-events: none;
   user-select: none;
 }
+
 
 
