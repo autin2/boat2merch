@@ -8,37 +8,6 @@
   <meta name="author" content="Your Brand Name" />
   <title>Boat2Merch - Turn Your Boat into Stickers & Shirts</title>
   <link rel="stylesheet" href="style.css" />
-  <style>
-    .image-wrapper {
-      position: relative;
-      display: inline-block;
-      max-width: 400px;
-      width: 90%;
-      margin: 20px auto;
-    }
-
-    .image-wrapper .ai-output {
-      width: 100%;
-      border-radius: 8px;
-      display: block;
-      box-shadow:
-        0 0 12px rgba(255, 152, 0, 0.8),
-        0 0 20px rgba(255, 152, 0, 0.6);
-      transition: box-shadow 0.3s ease-in-out;
-    }
-
-    .image-wrapper .overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      opacity: 0.6;
-      pointer-events: none;
-      user-select: none;
-    }
-  </style>
 </head>
 <body>
 
@@ -59,8 +28,10 @@
     <h1>Turn Your Boat into Custom Stickers, Shirts & More</h1>
     <p>Upload your boat photo and let our AI create unique designs for print-on-demand merchandise.</p>
 
+    <!-- Hidden file input -->
     <input type="file" id="boatUpload" accept="image/*" style="display: none;" />
 
+    <!-- Upload and Edit buttons -->
     <div style="margin-top: 20px;">
       <button class="btn-primary" id="uploadBtn">Upload Your Boat</button>
       <button class="btn-secondary" id="editBtn" style="display:none; margin-left: 10px;">Edit as Sticker</button>
@@ -83,16 +54,17 @@
 
       const file = boatUpload.files[0];
       resultContainer.innerHTML = 
-        <div class="loading-container">
-          <div class="spinner"></div>
-          <p>Uploading and generating image for <strong>${file.name}</strong>.<br/>This can take up to 2 minutes. Please wait...</p>
-        </div>
-      ;
+  <div class="loading-container">
+    <div class="spinner"></div>
+    <p>Uploading and generating image for <strong>${file.name}</strong>.<br/>This can take up to 2 minutes. Please wait...</p>
+  </div>
+;
 
       const formData = new FormData();
       formData.append("boatImage", file);
 
       try {
+        // Start prediction
         const uploadResp = await fetch("/generate-image", {
           method: "POST",
           body: formData,
@@ -104,7 +76,8 @@
         const predictionId = prediction?.id;
         if (!predictionId) throw new Error("No prediction ID returned");
 
-        const pollInterval = 2000;
+        // Poll function
+        const pollInterval = 2000; // ms
         const maxAttempts = 30;
         let attempts = 0;
 
@@ -115,21 +88,19 @@
 
           if (statusData.status === "succeeded" && statusData.output?.length) {
             const imageUrl = statusData.output[0];
-
             resultContainer.innerHTML = 
               <p>Your AI-generated drawing:</p>
-              <div class="image-wrapper">
-                <img src="${imageUrl}" alt="AI generated boat drawing" class="ai-output" />
-                <img src="/images/overlay.png" alt="Watermark" class="overlay" />
-              </div>
+              <img src="${imageUrl}" alt="AI generated boat drawing" class="ai-output" />
               <br/>
               <a href="${imageUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
             ;
 
+            // Show and configure Edit button
             editBtn.style.display = "inline-block";
             editBtn.onclick = () => {
               window.location.href = "edit.html?img=" + encodeURIComponent(imageUrl);
             };
+
           } else if (statusData.status === "failed") {
             resultContainer.innerHTML = <p>AI generation failed. Please try again.</p>;
           } else {
