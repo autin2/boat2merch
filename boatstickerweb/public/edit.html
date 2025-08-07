@@ -37,21 +37,48 @@
 
     .controls {
       margin-bottom: 20px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .controls label {
+      font-weight: bold;
+      color: #333;
+      user-select: none;
+    }
+
+    .controls select,
+    .controls input[type="number"],
+    .controls input[type="color"],
+    .controls button {
+      padding: 8px 10px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 1em;
+      cursor: pointer;
+      transition: border-color 0.2s, background-color 0.2s;
+    }
+
+    .controls select:focus,
+    .controls input[type="number"]:focus,
+    .controls input[type="color"]:focus {
+      outline: none;
+      border-color: #2196f3;
+      box-shadow: 0 0 5px #2196f3;
     }
 
     .controls button {
-      background: #2196f3;
-      color: #fff;
+      background-color: #2196f3;
+      color: white;
       border: none;
-      padding: 10px 16px;
-      border-radius: 4px;
-      margin: 0 8px 8px 0;
-      cursor: pointer;
-      transition: background 0.2s;
+      user-select: none;
     }
 
     .controls button:hover {
-      background: #1976d2;
+      background-color: #1976d2;
     }
 
     .text-box {
@@ -101,12 +128,27 @@
 
 <div class="editor-container">
   <div class="controls">
+    <label for="fontSelect">Font:</label>
+    <select id="fontSelect" aria-label="Font Family">
+      <option value="Arial" selected>Arial</option>
+      <option value="Comic Sans MS">Comic Sans</option>
+      <option value="Impact">Impact</option>
+      <option value="Georgia">Georgia</option>
+      <option value="Courier New">Courier New</option>
+    </select>
+
+    <label for="fontSize">Size:</label>
+    <input id="fontSize" type="number" min="8" max="72" value="24" aria-label="Font Size" />
+
+    <label for="textColor">Color:</label>
+    <input id="textColor" type="color" value="#000000" aria-label="Text Color" />
+
     <button id="addTextBtn">Add Text</button>
   </div>
 
   <div class="editor-canvas" id="canvas">
     <img id="preview" src="" alt="AI-generated boat image" />
-    <div class="bottom-buttons">
+    <div class="bottom-buttons" style="margin-top: 15px;">
       <button onclick="alert('Sticker purchase flow here')">Buy as Sticker</button>
       <button onclick="alert('Shirt purchase flow here')">Buy as Shirt</button>
       <button onclick="alert('Mug purchase flow here')">Buy as Mug</button>
@@ -121,6 +163,9 @@
   const canvas = document.getElementById("canvas");
   const previewImage = document.getElementById("preview");
   const addTextBtn = document.getElementById("addTextBtn");
+  const fontSelect = document.getElementById("fontSelect");
+  const fontSizeInput = document.getElementById("fontSize");
+  const textColorInput = document.getElementById("textColor");
 
   if (!imgSrc) {
     document.body.innerHTML = "<p style='text-align:center;'>Image not found. Please go back and generate an image first.</p>";
@@ -144,18 +189,22 @@
       box.contentEditable = true;
       box.innerText = "Edit me";
 
+      // Apply chosen font, size and color
+      box.style.fontFamily = fontSelect.value;
+      box.style.fontSize = fontSizeInput.value + "px";
+      box.style.color = textColorInput.value;
+
       const rect = canvas.getBoundingClientRect();
       box.style.left = `${e.clientX - rect.left}px`;
       box.style.top = `${e.clientY - rect.top}px`;
 
-      // Make sure box has initial width and height for resizing
-      box.style.width = '150px';
-      box.style.height = 'auto';
+      // Initial size
+      box.style.width = "150px";
+      box.style.height = "auto";
 
       box.addEventListener("mousedown", (e) => {
         if (e.target.classList.contains('resize-handle')) {
-          // resizing handled separately
-          return;
+          return; // resize handled separately
         }
         selectedBox = box;
         offsetX = e.offsetX;
@@ -199,7 +248,7 @@
 
   function deselectAll() {
     const boxes = document.querySelectorAll(".text-box");
-    boxes.forEach((box) => {
+    boxes.forEach(box => {
       box.classList.remove("selected");
       removeResizeHandles(box);
     });
@@ -221,8 +270,7 @@
   function addResizeHandles(box) {
     removeResizeHandles(box);
 
-    const handles = ['nw', 'ne', 'sw', 'se'];
-    handles.forEach(pos => {
+    ['nw', 'ne', 'sw', 'se'].forEach(pos => {
       const handle = document.createElement('div');
       handle.className = `resize-handle ${pos}`;
       box.appendChild(handle);
@@ -314,7 +362,6 @@
     document.removeEventListener('mousemove', resizeMouseMove);
     document.removeEventListener('mouseup', resizeMouseUp);
   }
-
 </script>
 
 </body>
