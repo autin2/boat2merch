@@ -43,15 +43,19 @@
     const boatUpload = document.getElementById("boatUpload");
     const editBtn = document.getElementById("editBtn");
 
-    // Create result container once, add class for styling
+    // Create result container hidden initially
     const resultContainer = document.createElement("div");
     resultContainer.classList.add("result-container");
+    resultContainer.style.display = "none";  // hidden at start
     document.querySelector(".hero").appendChild(resultContainer);
 
     uploadBtn.addEventListener("click", () => boatUpload.click());
 
     boatUpload.addEventListener("change", async () => {
       if (boatUpload.files.length === 0) return;
+
+      // Show container when upload starts
+      resultContainer.style.display = "block";
 
       const file = boatUpload.files[0];
       resultContainer.innerHTML = `
@@ -77,7 +81,7 @@
         const predictionId = prediction?.id;
         if (!predictionId) throw new Error("No prediction ID returned");
 
-        const pollInterval = 2000; // ms
+        const pollInterval = 2000;
         const maxAttempts = 30;
         let attempts = 0;
 
