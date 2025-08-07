@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Edit Sticker</title>
   <style>
     body {
@@ -28,17 +28,13 @@
       cursor: pointer;
     }
 
-    .toolbar button:hover {
-      background: #1976d2;
-    }
-
     .canvas {
       position: relative;
-      margin: 20px auto;
-      max-width: 900px;
-      height: 600px;
+      margin: 0 auto;
+      width: 100%;
+      height: 90vh;
       background: white;
-      border: 2px dashed #ccc;
+      border-top: 2px solid #ccc;
       overflow: hidden;
     }
 
@@ -50,41 +46,28 @@
 
     .text-box {
       position: absolute;
-      min-width: 40px;
-      min-height: 30px;
-      padding: 6px 10px;
-      background: rgba(255,255,255,0.8);
-      border: 2px dashed transparent;
+      padding: 4px 6px;
+      background: transparent;
+      border: 1px dashed transparent;
       outline: none;
       cursor: move;
       font-size: 20px;
       user-select: text;
+      white-space: pre;
     }
 
     .text-box.selected {
-      border: 2px dashed #2196f3;
-    }
-
-    .resize-handle {
-      width: 12px;
-      height: 12px;
-      background: #2196f3;
-      position: absolute;
-      bottom: -6px;
-      right: -6px;
-      cursor: se-resize;
-      border-radius: 2px;
+      border: 1px dashed #2196f3;
     }
   </style>
 </head>
 <body>
-
   <div class="toolbar">
     <button id="addText">Add Text</button>
   </div>
 
   <div class="canvas" id="canvas">
-    <img id="preview" src="" alt="Editable Image"/>
+    <img id="preview" src="" alt="Editable Image" />
   </div>
 
   <script>
@@ -126,48 +109,18 @@
         const box = document.createElement("div");
         box.className = "text-box";
         box.contentEditable = true;
-        box.innerText = "Edit me";
+        box.innerText = "Text";
 
         const rect = canvas.getBoundingClientRect();
         box.style.left = `${e.clientX - rect.left}px`;
         box.style.top = `${e.clientY - rect.top}px`;
 
-        const handle = document.createElement("div");
-        handle.className = "resize-handle";
-        box.appendChild(handle);
-
-        // Resize logic
-        handle.addEventListener("mousedown", (e) => {
-          e.stopPropagation();
-          let startX = e.clientX;
-          let startY = e.clientY;
-          const startWidth = parseInt(window.getComputedStyle(box).width);
-          const startHeight = parseInt(window.getComputedStyle(box).height);
-
-          function doDrag(e) {
-            box.style.width = `${startWidth + e.clientX - startX}px`;
-            box.style.height = `${startHeight + e.clientY - startY}px`;
-          }
-
-          function stopDrag() {
-            document.removeEventListener("mousemove", doDrag);
-            document.removeEventListener("mouseup", stopDrag);
-          }
-
-          document.addEventListener("mousemove", doDrag);
-          document.addEventListener("mouseup", stopDrag);
-        });
-
-        // Drag logic
         box.addEventListener("mousedown", (e) => {
-          selectedBox = box;
-          const boxRect = box.getBoundingClientRect();
-          const canvasRect = canvas.getBoundingClientRect();
-          offsetX = e.clientX - boxRect.left;
-          offsetY = e.clientY - boxRect.top;
-          selectBox(box);
-          document.body.style.cursor = "move";
-          e.stopPropagation();
+          if (!box.classList.contains("selected")) {
+            selectBox(box);
+          }
+          offsetX = e.offsetX;
+          offsetY = e.offsetY;
         });
 
         box.addEventListener("click", (e) => {
@@ -194,16 +147,11 @@
       }
     });
 
-    document.addEventListener("mouseup", () => {
-      document.body.style.cursor = "default";
-    });
-
     document.addEventListener("click", (e) => {
-      if (!e.target.classList.contains("text-box") && !e.target.closest(".text-box")) {
+      if (!e.target.classList.contains("text-box")) {
         deselectAll();
       }
     });
   </script>
-
 </body>
 </html>
