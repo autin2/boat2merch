@@ -96,7 +96,7 @@
           const imageUrl = statusData.output[0];
           resultContainer.innerHTML = `
             <p>Your AI-generated drawing:</p>
-            <img src="${imageUrl}" alt="AI generated boat drawing" style="max-width:100%; border-radius:8px;" />
+            <img src="${imageUrl}" alt="AI generated boat drawing" class="ai-output" />
             <br/>
             <a href="${imageUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
             <br/><br/>
@@ -151,3 +151,4 @@
 
 </body>
 </html>
+
