@@ -16,34 +16,47 @@
       max-width: 900px;
       margin: 0 auto;
       text-align: center;
+      display: flex;
+      align-items: flex-start;
+      gap: 15px;
+      user-select: none;
     }
 
-    #canvas {
-      position: relative;
-      display: inline-block;
-      border: 2px dashed #aaa;
-      margin-top: 20px;
-      background-color: white;
-      padding: 10px;
+    /* Trash area on left side */
+    .trash-area {
+      width: 70px;
+      height: 70px;
+      background: #e74c3c;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+      flex-shrink: 0;
+      transition: background 0.3s;
       user-select: none;
-      min-height: 400px;
+    }
+    .trash-area.drag-over {
+      background: #c0392b;
     }
 
-    #canvas img {
-      max-width: 100%;
-      display: block;
-      user-select: none;
+    .trash-area svg {
+      width: 36px;
+      height: 36px;
+      fill: white;
       pointer-events: none;
     }
 
+    /* Controls and canvas in a column */
     .controls {
-      margin-bottom: 20px;
+      flex-grow: 0;
       display: flex;
-      gap: 12px;
       flex-wrap: wrap;
-      justify-content: center;
+      gap: 12px;
+      justify-content: flex-start;
       align-items: center;
-      position: relative;
+      max-width: 750px;
+      margin-bottom: 10px;
     }
 
     .controls label {
@@ -79,36 +92,56 @@
       padding: 8px 15px;
       border-radius: 4px;
       cursor: pointer;
-      order: -1; /* Move to left */
+      order: -1; /* left side */
+      flex-shrink: 0;
     }
 
     #addTextBtn:hover {
       background-color: #1976d2;
     }
 
-    .trash-can {
-      position: absolute;
-      left: 10px;
-      top: 50px;
-      width: 50px;
-      height: 50px;
-      background: #e74c3c;
-      border-radius: 6px;
+    #canvas-wrapper {
+      flex-grow: 1;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      cursor: default;
+      position: relative;
       user-select: none;
-      transition: background 0.3s;
-    }
-    .trash-can.drag-over {
-      background: #c0392b;
     }
 
-    .trash-can svg {
-      width: 24px;
-      height: 24px;
-      fill: white;
+    #canvas {
+      position: relative;
+      display: inline-block;
+      border: 2px dashed #aaa;
+      background-color: white;
+      padding: 10px;
+      min-height: 400px;
+      min-width: 600px;
+      overflow: visible;
+    }
+
+    #canvas img {
+      max-width: 100%;
+      display: block;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .bottom-buttons {
+      margin-top: 15px;
+    }
+    .bottom-buttons button {
+      background: #2196f3;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 4px;
+      margin: 0 8px 8px 0;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .bottom-buttons button:hover {
+      background: #1976d2;
     }
 
     .text-box {
@@ -157,38 +190,43 @@
 <body>
 
 <div class="editor-container">
-  <div class="controls">
-    <button id="addTextBtn" title="Add Text (Click, then click canvas)">Add Text</button>
 
-    <label for="fontSelect">Font:</label>
-    <select id="fontSelect" aria-label="Font Family">
-      <option value="Arial" selected>Arial</option>
-      <option value="Comic Sans MS">Comic Sans</option>
-      <option value="Impact">Impact</option>
-      <option value="Georgia">Georgia</option>
-      <option value="Courier New">Courier New</option>
-    </select>
-
-    <label for="fontSize">Size:</label>
-    <input id="fontSize" type="number" min="8" max="72" value="24" aria-label="Font Size" />
-
-    <label for="textColor">Color:</label>
-    <input id="textColor" type="color" value="#000000" aria-label="Text Color" />
-
-    <div class="trash-can" id="trashCan" title="Drag text box here to delete">
-      <!-- simple trash can SVG icon -->
-      <svg viewBox="0 0 24 24"><path d="M3 6h18v2H3V6zm2 3h14v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9zm5 3v6h2v-6H10zm4 0v6h2v-6h-2z"/></svg>
-    </div>
+  <div class="trash-area" id="trashArea" title="Drag text box here to delete">
+    <!-- trash can icon -->
+    <svg viewBox="0 0 24 24"><path d="M3 6h18v2H3V6zm2 3h14v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9zm5 3v6h2v-6H10zm4 0v6h2v-6h-2z"/></svg>
   </div>
 
-  <div class="editor-canvas" id="canvas">
-    <img id="preview" src="" alt="AI-generated boat image" />
-    <div class="bottom-buttons" style="margin-top: 15px;">
+  <div id="canvas-wrapper">
+    <div class="controls">
+      <button id="addTextBtn" title="Add Text (Click, then click canvas)">Add Text</button>
+
+      <label for="fontSelect">Font:</label>
+      <select id="fontSelect" aria-label="Font Family">
+        <option value="Arial" selected>Arial</option>
+        <option value="Comic Sans MS">Comic Sans</option>
+        <option value="Impact">Impact</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Courier New">Courier New</option>
+      </select>
+
+      <label for="fontSize">Size:</label>
+      <input id="fontSize" type="number" min="8" max="72" value="24" aria-label="Font Size" />
+
+      <label for="textColor">Color:</label>
+      <input id="textColor" type="color" value="#000000" aria-label="Text Color" />
+    </div>
+
+    <div class="editor-canvas" id="canvas">
+      <img id="preview" src="" alt="AI-generated boat image" />
+    </div>
+
+    <div class="bottom-buttons">
       <button onclick="alert('Sticker purchase flow here')">Buy as Sticker</button>
       <button onclick="alert('Shirt purchase flow here')">Buy as Shirt</button>
       <button onclick="alert('Mug purchase flow here')">Buy as Mug</button>
     </div>
   </div>
+
 </div>
 
 <script>
@@ -201,7 +239,7 @@
   const fontSelect = document.getElementById("fontSelect");
   const fontSizeInput = document.getElementById("fontSize");
   const textColorInput = document.getElementById("textColor");
-  const trashCan = document.getElementById("trashCan");
+  const trashArea = document.getElementById("trashArea");
 
   if (!imgSrc) {
     document.body.innerHTML = "<p style='text-align:center;'>Image not found. Please go back and generate an image first.</p>";
@@ -299,8 +337,8 @@
 
   document.addEventListener("mouseup", () => {
     if (selectedBox && draggedBox === selectedBox) {
-      // Check if dropped inside trash can
-      const trashRect = trashCan.getBoundingClientRect();
+      // Check if dropped inside trash area
+      const trashRect = trashArea.getBoundingClientRect();
       const boxRect = selectedBox.getBoundingClientRect();
 
       if (
