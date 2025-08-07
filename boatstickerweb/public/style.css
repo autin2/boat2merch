@@ -268,6 +268,7 @@ nav a.active {
 
 
 .editor-container {
+  position: relative;
   max-width: 800px;
   margin: 40px auto;
   text-align: center;
@@ -340,10 +341,13 @@ nav a.active {
 
 .overlay {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  width: 100px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100px; /* or whatever size you want */
   opacity: 0.6;
   pointer-events: none;
   user-select: none;
 }
+
+
