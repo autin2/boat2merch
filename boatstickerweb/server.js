@@ -7,20 +7,20 @@ import fs from "fs";
 const app = express();
 const upload = multer({ dest: "uploads/" });
 
-// Env vars (set in Render or locally)
+// Environment variables (set in your hosting environment or locally)
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 app.use(express.static("public"));
 
-// Upload & generate image
+// Upload & generate image endpoint
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
   try {
     console.log("📂 Received file:", req.file);
 
-    // Upload to tmpfiles.org
+    // Upload the file to tmpfiles.org
     const form = new FormData();
     form.append("file", fs.createReadStream(req.file.path), req.file.originalname);
 
@@ -38,14 +38,14 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       return res.status(500).json({ error: "No URL returned from tmpfiles" });
     }
 
-    // Ensure direct download URL
+    // Convert URL to direct download link if needed
     let imageUrl = uploadData.data.url;
     if (!imageUrl.includes("/dl/")) {
       imageUrl = imageUrl.replace("tmpfiles.org/", "tmpfiles.org/dl/");
     }
     console.log("🔗 Direct image URL for AI:", imageUrl);
 
-    // Call Replicate
+    // Call Replicate API to generate the image with updated prompt
     console.log(`🚀 Calling Replicate model: openai/gpt-image-1`);
     const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
@@ -57,11 +57,11 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
         version: "openai/gpt-image-1",
         input: {
           prompt:
-            "Create a clean black and white line drawing of the boat shown in the input image only. No background or extra details.",
+            "Create a clean black and white line drawing of the boat shown in the input image only, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background, no extra elements or shadows.",
           input_images: [imageUrl],
           openai_api_key: OPENAI_API_KEY,
           quality: "auto",
-          background: "auto",
+          background: "transparent",
           moderation: "auto",
           aspect_ratio: "1:1",
           number_of_images: 1,
@@ -88,7 +88,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   }
 });
 
-// Poll prediction status
+// Poll prediction status endpoint
 app.get("/prediction-status/:id", async (req, res) => {
   try {
     const predictionId = req.params.id;
