@@ -5,131 +5,90 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Edit Your Boat Design</title>
   <link rel="stylesheet" href="style.css" />
-  <style>
-    body {
-      margin: 0;
-      font-family: sans-serif;
-      background: #f5f5f5;
-    }
+ <style>
 
-    .editor-wrapper {
-      display: flex;
-      height: 100vh;
-    }
+   body {
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f4;
+  margin: 0;
+  padding: 20px;
+}
 
-    .toolbox {
-      width: 250px;
-      background: #212121;
-      color: white;
-      padding: 20px;
-      box-sizing: border-box;
-    }
+.editor-container {
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
 
-    .text-box:focus, .text-box.selected {
-    outline: 2px solid #03a9f4;
-    box-shadow: 0 0 8px #03a9f4;
-    cursor: move;
-  }
+#canvas {
+  position: relative;
+  display: inline-block;
+  border: 2px dashed #aaa;
+  margin-top: 20px;
+  background-color: white;
+  padding: 10px;
+}
 
+#canvas img {
+  max-width: 100%;
+  display: block;
+}
 
-      /* Rotation handle */
-  .rotate-handle {
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    background: #03a9f4;
-    border-radius: 50%;
-    right: -10px;
-    top: -10px;
-    cursor: grab;
-  }
-    
-    
-    .toolbox h2 {
-      font-size: 18px;
-      margin-bottom: 10px;
-    }
+.controls {
+  margin-bottom: 20px;
+}
 
-    .toolbox label {
-      display: block;
-      margin-top: 10px;
-      font-size: 14px;
-    }
+.controls button {
+  background: #2196f3;
+  color: #fff;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 4px;
+  margin: 0 8px 8px 0;
+  cursor: pointer;
+  transition: background 0.2s;
+}
 
-    .toolbox input,
-    .toolbox select,
-    .toolbox button {
-      width: 100%;
-      margin-top: 4px;
-      padding: 8px;
-      box-sizing: border-box;
-      border-radius: 4px;
-      border: none;
-    }
+.controls button:hover {
+  background: #1976d2;
+}
 
-    .toolbox button {
-      background: #03a9f4;
-      color: #fff;
-      margin-top: 15px;
-      cursor: pointer;
-    }
+.btn-product {
+  background: #03a9f4;
+  color: #121212;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin: 5px;
+}
 
-    .toolbox button:hover {
-      background: #0288d1;
-    }
+.btn-product:hover {
+  background: #0288d1;
+}
 
-    .editor-canvas {
-      flex-grow: 1;
-      background: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      overflow: hidden;
-    }
+.text-box {
+  position: absolute;
+  font-size: 24px;
+  font-family: Arial, sans-serif;
+  color: black;
+  background: transparent;
+  cursor: move;
+  user-select: none;
+  padding: 4px 8px;
+  white-space: pre;
+}
 
-    .editor-canvas img {
-      max-width: 90%;
-      max-height: 90%;
-      outline: 4px solid #ccc;
-      border-radius: 6px;
-    }
+.text-box:focus {
+  outline: none;
+}
 
-    .text-box {
-      position: absolute;
-      padding: 4px 8px;
-      cursor: move;
-      resize: both;
-      overflow: hidden;
-      border: 1px dashed #666;
-      background: rgba(255, 255, 255, 0.6);
-    }
+.text-box.selected {
+  outline: 2px solid #2196f3;
+}
 
-    .resizable {
-      resize: both;
-      overflow: auto;
-    }
-
-    .bottom-buttons {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-    }
-
-    .bottom-buttons button {
-      margin-right: 10px;
-      padding: 10px 15px;
-      border: none;
-      border-radius: 6px;
-      background: #03a9f4;
-      color: #fff;
-      cursor: pointer;
-    }
-
-    .bottom-buttons button:hover {
-      background: #0288d1;
-    }
-  </style>
+   
+ </style>
 </head>
 <body>
 
@@ -168,185 +127,92 @@
     </div>
   </div>
 </div>
+
 <script>
-// 1. Image load from URL param (keep this)
-const urlParams = new URLSearchParams(window.location.search);
-const img = urlParams.get("img");
+  const urlParams = new URLSearchParams(window.location.search);
+  const imgSrc = urlParams.get("img");
 
-if (!img) {
-  document.body.innerHTML = "<p style='text-align:center;'>Image not found. Please go back and generate an image first.</p>";
-} else {
-  document.getElementById("preview").src = img;
-}
+  const canvas = document.getElementById("canvas");
+  const previewImage = document.getElementById("preview");
+  const addTextBtn = document.getElementById("addTextBtn");
 
-// 2. New text adding / selecting / dragging / rotating code (replace your old addText and related logic)
-let addingTextMode = false;
-let selectedTextBox = null;
-
-const canvas = document.getElementById("canvas");
-const textInput = document.getElementById("textInput");
-const fontSelect = document.getElementById("fontSelect");
-const fontSize = document.getElementById("fontSize");
-const textColor = document.getElementById("textColor");
-const addTextBtn = document.querySelector("button[onclick='addText()']");
-
-addTextBtn.onclick = () => {
-  addingTextMode = true;
-  canvas.style.cursor = "text";
-  addTextBtn.disabled = true;
-  textInput.value = ""; // Clear input for new text
-};
-
-canvas.onclick = (e) => {
-  if (!addingTextMode) return;
-
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-
-  // Create new editable text box
-  const div = document.createElement("div");
-  div.className = "text-box selected";
-  div.contentEditable = true;
-  div.innerText = textInput.value || "Edit me";
-  div.style.fontFamily = fontSelect.value;
-  div.style.fontSize = fontSize.value + "px";
-  div.style.color = textColor.value;
-  div.style.left = x + "px";
-  div.style.top = y + "px";
-  div.style.position = "absolute";
-  div.style.userSelect = "text";
-  div.style.transform = "rotate(0deg)";
-  div.style.minWidth = "50px";
-  div.style.minHeight = "24px";
-  div.style.padding = "2px 5px";
-  div.style.whiteSpace = "pre-wrap";
-
-  canvas.appendChild(div);
-  div.focus();
-
-  addTextBtn.disabled = false;
-  canvas.style.cursor = "default";
-  addingTextMode = false;
-
-  selectTextBox(div);
-};
-
-function selectTextBox(div) {
-  // Deselect previous
-  if (selectedTextBox && selectedTextBox !== div) {
-    selectedTextBox.classList.remove("selected");
-    removeRotateHandle(selectedTextBox);
-  }
-  selectedTextBox = div;
-  selectedTextBox.classList.add("selected");
-  addRotateHandle(selectedTextBox);
-}
-
-function deselectAll() {
-  if (selectedTextBox) {
-    selectedTextBox.classList.remove("selected");
-    removeRotateHandle(selectedTextBox);
-    selectedTextBox = null;
-  }
-}
-
-function addRotateHandle(div) {
-  const handle = document.createElement("div");
-  handle.className = "rotate-handle";
-  div.appendChild(handle);
-
-  let startAngle = 0;
-  let startX, startY;
-
-  handle.onmousedown = (e) => {
-    e.stopPropagation();
-    e.preventDefault();
-
-    const rect = div.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    startX = e.clientX;
-    startY = e.clientY;
-    startAngle = getRotationAngle(div);
-
-    function onMouseMove(ev) {
-      const dx = ev.clientX - centerX;
-      const dy = ev.clientY - centerY;
-      let angle = Math.atan2(dy, dx) * (180 / Math.PI);
-      angle = angle < 0 ? 360 + angle : angle;
-
-      let rotation = angle; // Or adjust relative to startAngle if needed
-      div.style.transform = `rotate(${rotation}deg)`;
-    }
-
-    function onMouseUp() {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-    }
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  };
-}
-
-function removeRotateHandle(div) {
-  const handle = div.querySelector(".rotate-handle");
-  if (handle) div.removeChild(handle);
-}
-
-function getRotationAngle(el) {
-  const st = window.getComputedStyle(el, null);
-  const tr = st.getPropertyValue("transform");
-  if (tr === "none") return 0;
-  const values = tr.split('(')[1].split(')')[0].split(',');
-  const a = values[0];
-  const b = values[1];
-  const angle = Math.round(Math.atan2(b, a) * (180/Math.PI));
-  return angle < 0 ? angle + 360 : angle;
-}
-
-// Make selected text draggable
-document.addEventListener("mousedown", function(e) {
-  if (!selectedTextBox) return;
-
-  if (!selectedTextBox.contains(e.target)) return;
-
-  if (e.target.classList.contains("rotate-handle")) return; // skip rotate handle drag
-
-  e.preventDefault();
-
-  let shiftX = e.clientX - selectedTextBox.getBoundingClientRect().left;
-  let shiftY = e.clientY - selectedTextBox.getBoundingClientRect().top;
-
-  function moveAt(pageX, pageY) {
-    selectedTextBox.style.left = pageX - shiftX + "px";
-    selectedTextBox.style.top = pageY - shiftY + "px";
+  if (!imgSrc) {
+    document.body.innerHTML = "<p style='text-align:center;'>Image not found. Please go back and generate an image first.</p>";
+  } else {
+    previewImage.src = imgSrc;
   }
 
-  function onMouseMove(event) {
-    moveAt(event.pageX, event.pageY);
-  }
+  let addingText = false;
+  let selectedBox = null;
+  let offsetX, offsetY;
 
-  document.addEventListener("mousemove", onMouseMove);
-
-  document.addEventListener("mouseup", function onMouseUp() {
-    document.removeEventListener("mousemove", onMouseMove);
-    document.removeEventListener("mouseup", onMouseUp);
+  addTextBtn.addEventListener("click", () => {
+    addingText = true;
+    document.body.style.cursor = "text";
   });
-});
 
-// Select text box on click
-canvas.addEventListener("click", (e) => {
-  if (e.target.classList.contains("text-box")) {
-    selectTextBox(e.target);
-  } else if (!addingTextMode) {
-    deselectAll();
+  canvas.addEventListener("click", (e) => {
+    if (addingText) {
+      const box = document.createElement("div");
+      box.className = "text-box";
+      box.contentEditable = true;
+      box.innerText = "Edit me";
+
+      const rect = canvas.getBoundingClientRect();
+      box.style.left = `${e.clientX - rect.left}px`;
+      box.style.top = `${e.clientY - rect.top}px`;
+
+      box.addEventListener("mousedown", (e) => {
+        selectedBox = box;
+        offsetX = e.offsetX;
+        offsetY = e.offsetY;
+        document.body.style.cursor = "move";
+        selectBox(box);
+        e.stopPropagation();
+      });
+
+      box.addEventListener("click", (e) => {
+        selectBox(box);
+        e.stopPropagation();
+      });
+
+      canvas.appendChild(box);
+      selectBox(box);
+      box.focus();
+
+      addingText = false;
+      document.body.style.cursor = "default";
+    } else {
+      deselectAll();
+    }
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (selectedBox && e.buttons === 1) {
+      const rect = canvas.getBoundingClientRect();
+      selectedBox.style.left = `${e.clientX - rect.left - offsetX}px`;
+      selectedBox.style.top = `${e.clientY - rect.top - offsetY}px`;
+    }
+  });
+
+  document.addEventListener("mouseup", () => {
+    selectedBox = null;
+    document.body.style.cursor = "default";
+  });
+
+  function deselectAll() {
+    const boxes = document.querySelectorAll(".text-box");
+    boxes.forEach((box) => box.classList.remove("selected"));
   }
-});
 
+  function selectBox(box) {
+    deselectAll();
+    box.classList.add("selected");
+  }
 </script>
+
+  
 </body>
 </html>
+
 
