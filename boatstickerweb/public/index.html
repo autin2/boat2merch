@@ -8,21 +8,6 @@
   <meta name="author" content="Your Brand Name" />
   <title>Boat2Merch - Turn Your Boat into Stickers & Shirts</title>
   <link rel="stylesheet" href="style.css" />
-  <style>
-    .btn-sticker {
-      background: #4caf50;
-      color: #fff;
-      padding: 12px 25px;
-      border: none;
-      font-size: 1em;
-      cursor: pointer;
-      border-radius: 6px;
-      margin-top: 10px;
-    }
-    .btn-sticker:hover {
-      background: #43a047;
-    }
-  </style>
 </head>
 <body>
 
@@ -46,80 +31,89 @@
     <!-- Hidden file input -->
     <input type="file" id="boatUpload" accept="image/*" style="display: none;" />
 
-    <!-- Upload button -->
-    <button class="btn-primary" id="uploadBtn">Upload Your Boat</button>
+    <!-- Upload and Edit buttons -->
+    <div style="margin-top: 20px;">
+      <button class="btn-primary" id="uploadBtn">Upload Your Boat</button>
+      <button class="btn-secondary" id="editBtn" style="display:none; margin-left: 10px;">Edit as Sticker</button>
+    </div>
   </section>
 
-<script>
-  const uploadBtn = document.getElementById("uploadBtn");
-  const boatUpload = document.getElementById("boatUpload");
+  <script>
+    const uploadBtn = document.getElementById("uploadBtn");
+    const boatUpload = document.getElementById("boatUpload");
+    const editBtn = document.getElementById("editBtn");
 
-  const resultContainer = document.createElement("div");
-  resultContainer.style.marginTop = "20px";
-  document.querySelector(".hero").appendChild(resultContainer);
+    const resultContainer = document.createElement("div");
+    resultContainer.style.marginTop = "20px";
+    document.querySelector(".hero").appendChild(resultContainer);
 
-  uploadBtn.addEventListener("click", () => boatUpload.click());
+    uploadBtn.addEventListener("click", () => boatUpload.click());
 
-  boatUpload.addEventListener("change", async () => {
-    if (boatUpload.files.length === 0) return;
+    boatUpload.addEventListener("change", async () => {
+      if (boatUpload.files.length === 0) return;
 
-    const file = boatUpload.files[0];
-    resultContainer.innerHTML = `<p>Uploading and generating image for <strong>${file.name}</strong>... Please wait.</p>`;
+      const file = boatUpload.files[0];
+      resultContainer.innerHTML = `<p>Uploading and generating image for <strong>${file.name}</strong>... Please wait.</p>`;
 
-    const formData = new FormData();
-    formData.append("boatImage", file);
+      const formData = new FormData();
+      formData.append("boatImage", file);
 
-    try {
-      // Start prediction
-      const uploadResp = await fetch("/generate-image", {
-        method: "POST",
-        body: formData,
-      });
+      try {
+        // Start prediction
+        const uploadResp = await fetch("/generate-image", {
+          method: "POST",
+          body: formData,
+        });
 
-      if (!uploadResp.ok) throw new Error("Upload failed");
+        if (!uploadResp.ok) throw new Error("Upload failed");
 
-      const { prediction } = await uploadResp.json();
-      const predictionId = prediction?.id;
-      if (!predictionId) throw new Error("No prediction ID returned");
+        const { prediction } = await uploadResp.json();
+        const predictionId = prediction?.id;
+        if (!predictionId) throw new Error("No prediction ID returned");
 
-      // Poll function
-      const pollInterval = 2000; // ms
-      const maxAttempts = 30;
-      let attempts = 0;
+        // Poll function
+        const pollInterval = 2000; // ms
+        const maxAttempts = 30;
+        let attempts = 0;
 
-      async function poll() {
-        attempts++;
-        const statusResp = await fetch(`/prediction-status/${predictionId}`);
-        const statusData = await statusResp.json();
+        async function poll() {
+          attempts++;
+          const statusResp = await fetch(`/prediction-status/${predictionId}`);
+          const statusData = await statusResp.json();
 
-        if (statusData.status === "succeeded" && statusData.output?.length) {
-          const imageUrl = statusData.output[0];
-          resultContainer.innerHTML = `
-            <p>Your AI-generated drawing:</p>
-            <img src="${imageUrl}" alt="AI generated boat drawing" class="ai-output" />
-            <br/>
-            <a href="${imageUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
-            <br/><br/>
-            <button class="btn-sticker">🛒 Buy as Sticker</button>
-          `;
-        } else if (statusData.status === "failed") {
-          resultContainer.innerHTML = `<p>AI generation failed. Please try again.</p>`;
-        } else {
-          if (attempts < maxAttempts) {
-            setTimeout(poll, pollInterval);
+          if (statusData.status === "succeeded" && statusData.output?.length) {
+            const imageUrl = statusData.output[0];
+            resultContainer.innerHTML = `
+              <p>Your AI-generated drawing:</p>
+              <img src="${imageUrl}" alt="AI generated boat drawing" class="ai-output" />
+              <br/>
+              <a href="${imageUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
+            `;
+
+            // Show and configure Edit button
+            editBtn.style.display = "inline-block";
+            editBtn.onclick = () => {
+              window.location.href = "edit.html?img=" + encodeURIComponent(imageUrl);
+            };
+
+          } else if (statusData.status === "failed") {
+            resultContainer.innerHTML = `<p>AI generation failed. Please try again.</p>`;
           } else {
-            resultContainer.innerHTML = `<p>Generation timed out. Please try again later.</p>`;
+            if (attempts < maxAttempts) {
+              setTimeout(poll, pollInterval);
+            } else {
+              resultContainer.innerHTML = `<p>Generation timed out. Please try again later.</p>`;
+            }
           }
         }
-      }
 
-      poll();
-    } catch (error) {
-      console.error(error);
-      resultContainer.innerHTML = `<p>Error: ${error.message}</p>`;
-    }
-  });
-</script>
+        poll();
+      } catch (error) {
+        console.error(error);
+        resultContainer.innerHTML = `<p>Error: ${error.message}</p>`;
+      }
+    });
+  </script>
 
   <!-- Features -->
   <section class="features">
@@ -151,4 +145,3 @@
 
 </body>
 </html>
-
