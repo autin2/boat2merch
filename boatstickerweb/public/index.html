@@ -8,6 +8,21 @@
   <meta name="author" content="Your Brand Name" />
   <title>Boat2Merch - Turn Your Boat into Stickers & Shirts</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .btn-sticker {
+      background: #4caf50;
+      color: #fff;
+      padding: 12px 25px;
+      border: none;
+      font-size: 1em;
+      cursor: pointer;
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+    .btn-sticker:hover {
+      background: #43a047;
+    }
+  </style>
 </head>
 <body>
 
@@ -84,6 +99,8 @@
             <img src="${imageUrl}" alt="AI generated boat drawing" style="max-width:100%; border-radius:8px;" />
             <br/>
             <a href="${imageUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
+            <br/><br/>
+            <button class="btn-sticker">🛒 Buy as Sticker</button>
           `;
         } else if (statusData.status === "failed") {
           resultContainer.innerHTML = `<p>AI generation failed. Please try again.</p>`;
@@ -134,5 +151,3 @@
 
 </body>
 </html>
-
-
