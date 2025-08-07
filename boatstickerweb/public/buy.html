@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Buy Your Sticker</title>
+  <script src="https://js.stripe.com/v3/"></script> <!-- For payments -->
+</head>
+<body>
+  <h1>Buy Your Sticker</h1>
+  <img id="product-image" alt="Sticker preview" style="max-width:300px;" />
+  
+  <form id="purchase-form">
+    <label>Email: <input type="email" id="email" required /></label><br/>
+    <label>Name: <input type="text" id="name" required /></label><br/>
+    <label>Address: <textarea id="address" required></textarea></label><br/>
+    <div id="card-element"><!-- Stripe injects card input here --></div><br/>
+    <button type="submit">Buy Now</button>
+  </form>
+
+  <script>
+    // Get img from URL params and set it
+    const params = new URLSearchParams(window.location.search);
+    const imgUrl = params.get('img');
+    if(imgUrl) document.getElementById('product-image').src = imgUrl;
+
+    // Stripe payment setup (you need to get your own Stripe publishable key)
+    const stripe = Stripe('YOUR_STRIPE_PUBLISHABLE_KEY');
+    const elements = stripe.elements();
+    const card = elements.create('card');
+    card.mount('#card-element');
+
+    const form = document.getElementById('purchase-form');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById('email').value;
+      const name = document.getElementById('name').value;
+      const address = document.getElementById('address').value;
+
+      // Create payment method & handle payment (you will need backend to create PaymentIntent)
+      // This is a simplified flow, Stripe docs have full example:
+      const {paymentMethod, error} = await stripe.createPaymentMethod({
+        type: 'card',
+        card: card,
+        billing_details: { email, name, address: { line1: address } },
+      });
+
+      if(error) {
+        alert(error.message);
+        return;
+      }
+
+      // Send paymentMethod.id, email, shipping info, imgUrl to your backend for processing order & payment
+
+      alert('Payment method created. Now handle order server-side.');
+    });
+  </script>
+</body>
+</html>
