@@ -289,4 +289,17 @@ nav a.active {
   background: #0288d1;
 }
 
+.btn-secondary {
+  background: #4caf50;
+  color: #fff;
+  padding: 12px 25px;
+  border: none;
+  font-size: 1em;
+  cursor: pointer;
+  border-radius: 6px;
+  margin-top: 10px;
+}
 
+.btn-secondary:hover {
+  background: #43a047;
+}
