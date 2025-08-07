@@ -53,7 +53,12 @@
       if (boatUpload.files.length === 0) return;
 
       const file = boatUpload.files[0];
-      resultContainer.innerHTML = `<p>Uploading and generating image for <strong>${file.name}</strong>... Please wait.</p>`;
+      resultContainer.innerHTML = `
+  <div class="loading-container">
+    <div class="spinner"></div>
+    <p>Uploading and generating image for <strong>${file.name}</strong>.<br/>This can take up to 2 minutes. Please wait...</p>
+  </div>
+`;
 
       const formData = new FormData();
       formData.append("boatImage", file);
@@ -145,3 +150,4 @@
 
 </body>
 </html>
+
