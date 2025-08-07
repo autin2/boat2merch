@@ -2,180 +2,145 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Turn your boat into a custom sticker, shirt, or any print-on-demand item using AI." />
-  <meta name="keywords" content="boat sticker, boat shirt, custom boat print, AI boat art, personalized boat merchandise" />
-  <meta name="author" content="Your Brand Name" />
-  <title>Boat2Merch - Turn Your Boat into Stickers & Shirts</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Boat AI Generator</title>
   <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #111;
+      color: #fff;
+      text-align: center;
+      padding: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+    }
+    .btn {
+      background-color: orange;
+      border: none;
+      padding: 10px 20px;
+      margin: 10px;
+      cursor: pointer;
+      font-size: 16px;
+      border-radius: 5px;
+      color: #000;
+      font-weight: bold;
+    }
+    .btn:hover {
+      background-color: #ffb84d;
+    }
+    #result {
+      margin-top: 20px;
+    }
     .image-wrapper {
       position: relative;
       display: inline-block;
-      max-width: 400px;
-      width: 90%;
-      margin: 20px auto;
+      padding: 10px;
+      background-color: #000;
+      border-radius: 10px;
+      box-shadow: 0 0 30px orange;
     }
-
-    .image-wrapper .ai-output {
-      width: 100%;
-      border-radius: 8px;
-      display: block;
-      box-shadow:
-        0 0 12px rgba(255, 152, 0, 0.8),
-        0 0 20px rgba(255, 152, 0, 0.6);
-      transition: box-shadow 0.3s ease-in-out;
+    .ai-output {
+      max-width: 100%;
+      border-radius: 10px;
     }
-
-    .image-wrapper .overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      opacity: 0.6;
-      pointer-events: none;
-      user-select: none;
+    .btn-download {
+      display: inline-block;
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 20px;
+      text-decoration: none;
+      margin-top: 10px;
+      border-radius: 5px;
+    }
+    .btn-download:hover {
+      background-color: #45a049;
+    }
+    #zoom-controls {
+      margin-top: 10px;
+    }
+    #zoom-controls button {
+      background-color: #444;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      margin: 0 5px;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    #zoom-controls button:hover {
+      background-color: #666;
     }
   </style>
 </head>
 <body>
-
-  <!-- Header -->
-  <header>
-    <div class="logo">🚤 Boat2Merch</div>
-    <nav>
-      <a href="index.html">Home</a>
-      <a href="how-it-works.html">How It Works</a>
-      <a href="pricing.html">Pricing</a>
-      <a href="examples.html">Examples</a>
-      <a href="contact.html">Contact</a>
-    </nav>
-  </header>
-
-  <!-- Hero Section -->
-  <section class="hero">
-    <h1>Turn Your Boat into Custom Stickers, Shirts & More</h1>
-    <p>Upload your boat photo and let our AI create unique designs for print-on-demand merchandise.</p>
-
-    <input type="file" id="boatUpload" accept="image/*" style="display: none;" />
-
-    <div style="margin-top: 20px;">
-      <button class="btn-primary" id="uploadBtn">Upload Your Boat</button>
-      <button class="btn-secondary" id="editBtn" style="display:none; margin-left: 10px;">Edit as Sticker</button>
-    </div>
-  </section>
+  <div class="container">
+    <h1>Boat AI Generator</h1>
+    <textarea id="prompt" rows="3" cols="50" placeholder="Describe your boat design..."></textarea><br/>
+    <button id="generateBtn" class="btn">Generate</button>
+    <div id="result"></div>
+  </div>
 
   <script>
-    const uploadBtn = document.getElementById("uploadBtn");
-    const boatUpload = document.getElementById("boatUpload");
-    const editBtn = document.getElementById("editBtn");
+    const generateBtn = document.getElementById('generateBtn');
+    const resultContainer = document.getElementById('result');
 
-    const resultContainer = document.createElement("div");
-    resultContainer.style.marginTop = "20px";
-    document.querySelector(".hero").appendChild(resultContainer);
+    generateBtn.addEventListener('click', async () => {
+      const prompt = document.getElementById('prompt').value.trim();
+      if (!prompt) {
+        alert('Please enter a description.');
+        return;
+      }
 
-    uploadBtn.addEventListener("click", () => boatUpload.click());
-
-    boatUpload.addEventListener("change", async () => {
-      if (boatUpload.files.length === 0) return;
-
-      const file = boatUpload.files[0];
-      resultContainer.innerHTML = `
-        <div class="loading-container">
-          <div class="spinner"></div>
-          <p>Uploading and generating image for <strong>${file.name}</strong>.<br/>This can take up to 2 minutes. Please wait...</p>
-        </div>
-      `;
-
-      const formData = new FormData();
-      formData.append("boatImage", file);
+      resultContainer.innerHTML = '<p>Generating...</p>';
 
       try {
-        const uploadResp = await fetch("/generate-image", {
-          method: "POST",
-          body: formData,
+        const response = await fetch('/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt })
         });
 
-        if (!uploadResp.ok) throw new Error("Upload failed");
+        const data = await response.json();
+        if (data.imageUrl) {
+          const imageUrl = data.imageUrl;
 
-        const { prediction } = await uploadResp.json();
-        const predictionId = prediction?.id;
-        if (!predictionId) throw new Error("No prediction ID returned");
-
-        const pollInterval = 2000;
-        const maxAttempts = 30;
-        let attempts = 0;
-
-        async function poll() {
-          attempts++;
-          const statusResp = await fetch(`/prediction-status/${predictionId}`);
-          const statusData = await statusResp.json();
-
-          if (statusData.status === "succeeded" && statusData.output?.length) {
-            const imageUrl = statusData.output[0];
-
-            resultContainer.innerHTML = `
-              <p>Your AI-generated drawing:</p>
-              <div class="image-wrapper">
-                <img src="${imageUrl}" alt="AI generated boat drawing" class="ai-output" />
-                <img src="/images/overlay.png" alt="Watermark" class="overlay" />
-              </div>
-              <br/>
-              <a href="${imageUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
-            `;
-
-            editBtn.style.display = "inline-block";
-            editBtn.onclick = () => {
-              window.location.href = "edit.html?img=" + encodeURIComponent(imageUrl);
-            };
-          } else if (statusData.status === "failed") {
-            resultContainer.innerHTML = `<p>AI generation failed. Please try again.</p>`;
-          } else {
-            if (attempts < maxAttempts) {
-              setTimeout(poll, pollInterval);
-            } else {
-              resultContainer.innerHTML = `<p>Generation timed out. Please try again later.</p>`;
-            }
-          }
+          resultContainer.innerHTML = `
+            <p>Your AI-generated drawing:</p>
+            <div class="image-wrapper">
+              <img src="${imageUrl}" alt="AI generated boat drawing" class="ai-output" id="outputImage" />
+            </div>
+            <div id="zoom-controls">
+              <button onclick="zoomImage(1.2)">Zoom In</button>
+              <button onclick="zoomImage(0.8)">Zoom Out</button>
+              <button onclick="resetZoom()">Reset</button>
+            </div>
+            <br/>
+            <a href="${imageUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
+          `;
+        } else {
+          resultContainer.innerHTML = '<p>Failed to generate image.</p>';
         }
-
-        poll();
-      } catch (error) {
-        console.error(error);
-        resultContainer.innerHTML = `<p>Error: ${error.message}</p>`;
+      } catch (err) {
+        console.error(err);
+        resultContainer.innerHTML = '<p>Error generating image.</p>';
       }
     });
+
+    let zoomLevel = 1;
+    function zoomImage(factor) {
+      const img = document.getElementById('outputImage');
+      if (!img) return;
+      zoomLevel *= factor;
+      img.style.transform = `scale(${zoomLevel})`;
+    }
+    function resetZoom() {
+      const img = document.getElementById('outputImage');
+      if (!img) return;
+      zoomLevel = 1;
+      img.style.transform = 'scale(1)';
+    }
   </script>
-
-  <!-- Features -->
-  <section class="features">
-    <div class="feature">
-      <h2>🎨 AI-Powered Art</h2>
-      <p>We transform your boat photo into stunning artwork perfect for merchandise.</p>
-    </div>
-    <div class="feature">
-      <h2>🛍 Print-On-Demand</h2>
-      <p>Order stickers, shirts, mugs, and more — no minimum quantity.</p>
-    </div>
-    <div class="feature">
-      <h2>⚡ Fast & Easy</h2>
-      <p>Upload your photo, choose your style, and get your product.</p>
-    </div>
-  </section>
-
-  <!-- Call to Action -->
-  <section class="cta">
-    <h2>Get Started Today</h2>
-    <p>Your boat deserves to be more than just a photo.</p>
-    <button class="btn-secondary">Start Now</button>
-  </section>
-
-  <!-- Footer -->
-  <footer>
-    <p>&copy; 2025 Boat2Merch | All rights reserved.</p>
-  </footer>
-
 </body>
 </html>
