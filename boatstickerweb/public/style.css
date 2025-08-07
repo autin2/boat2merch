@@ -337,19 +337,6 @@ nav a.active {
 }
 
 
-
-
-.overlay {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100px; /* or whatever size you want */
-  opacity: 0.6;
-  pointer-events: none;
-  user-select: none;
-}
-
 .image-wrapper {
   position: relative;
   display: inline-block;
@@ -381,4 +368,5 @@ nav a.active {
   pointer-events: none;
   user-select: none;
 }
+
 
