@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Edit Your Boat Design</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .editor-container {
+      max-width: 800px;
+      margin: 40px auto;
+      text-align: center;
+    }
+
+    .editor-container img {
+      max-width: 100%;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .btn-product {
+      background: #03a9f4;
+      color: #121212;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 5px;
+    }
+
+    .btn-product:hover {
+      background: #0288d1;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="editor-container">
+    <h1>Customize Your Design</h1>
+    <img id="preview" src="" alt="AI-generated boat image" />
+    <div>
+      <button class="btn-product">Buy as Sticker</button>
+      <button class="btn-product">Buy as Shirt</button>
+      <button class="btn-product">Buy as Mug</button>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const img = urlParams.get("img");
+
+    if (!img) {
+      document.body.innerHTML = "<p style='text-align:center;'>Image not found. Please go back and generate an image first.</p>";
+    } else {
+      document.getElementById("preview").src = img;
+    }
+  </script>
+
+</body>
+</html>
