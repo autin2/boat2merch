@@ -25,6 +25,26 @@
       box-sizing: border-box;
     }
 
+    .text-box:focus, .text-box.selected {
+    outline: 2px solid #03a9f4;
+    box-shadow: 0 0 8px #03a9f4;
+    cursor: move;
+  }
+
+
+      /* Rotation handle */
+  .rotate-handle {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: #03a9f4;
+    border-radius: 50%;
+    right: -10px;
+    top: -10px;
+    cursor: grab;
+  }
+    
+    
     .toolbox h2 {
       font-size: 18px;
       margin-bottom: 10px;
@@ -148,62 +168,185 @@
     </div>
   </div>
 </div>
-
 <script>
-  const urlParams = new URLSearchParams(window.location.search);
-  const img = urlParams.get("img");
+// 1. Image load from URL param (keep this)
+const urlParams = new URLSearchParams(window.location.search);
+const img = urlParams.get("img");
 
-  if (!img) {
-    document.body.innerHTML = "<p style='text-align:center;'>Image not found. Please go back and generate an image first.</p>";
-  } else {
-    document.getElementById("preview").src = img;
+if (!img) {
+  document.body.innerHTML = "<p style='text-align:center;'>Image not found. Please go back and generate an image first.</p>";
+} else {
+  document.getElementById("preview").src = img;
+}
+
+// 2. New text adding / selecting / dragging / rotating code (replace your old addText and related logic)
+let addingTextMode = false;
+let selectedTextBox = null;
+
+const canvas = document.getElementById("canvas");
+const textInput = document.getElementById("textInput");
+const fontSelect = document.getElementById("fontSelect");
+const fontSize = document.getElementById("fontSize");
+const textColor = document.getElementById("textColor");
+const addTextBtn = document.querySelector("button[onclick='addText()']");
+
+addTextBtn.onclick = () => {
+  addingTextMode = true;
+  canvas.style.cursor = "text";
+  addTextBtn.disabled = true;
+  textInput.value = ""; // Clear input for new text
+};
+
+canvas.onclick = (e) => {
+  if (!addingTextMode) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  // Create new editable text box
+  const div = document.createElement("div");
+  div.className = "text-box selected";
+  div.contentEditable = true;
+  div.innerText = textInput.value || "Edit me";
+  div.style.fontFamily = fontSelect.value;
+  div.style.fontSize = fontSize.value + "px";
+  div.style.color = textColor.value;
+  div.style.left = x + "px";
+  div.style.top = y + "px";
+  div.style.position = "absolute";
+  div.style.userSelect = "text";
+  div.style.transform = "rotate(0deg)";
+  div.style.minWidth = "50px";
+  div.style.minHeight = "24px";
+  div.style.padding = "2px 5px";
+  div.style.whiteSpace = "pre-wrap";
+
+  canvas.appendChild(div);
+  div.focus();
+
+  addTextBtn.disabled = false;
+  canvas.style.cursor = "default";
+  addingTextMode = false;
+
+  selectTextBox(div);
+};
+
+function selectTextBox(div) {
+  // Deselect previous
+  if (selectedTextBox && selectedTextBox !== div) {
+    selectedTextBox.classList.remove("selected");
+    removeRotateHandle(selectedTextBox);
+  }
+  selectedTextBox = div;
+  selectedTextBox.classList.add("selected");
+  addRotateHandle(selectedTextBox);
+}
+
+function deselectAll() {
+  if (selectedTextBox) {
+    selectedTextBox.classList.remove("selected");
+    removeRotateHandle(selectedTextBox);
+    selectedTextBox = null;
+  }
+}
+
+function addRotateHandle(div) {
+  const handle = document.createElement("div");
+  handle.className = "rotate-handle";
+  div.appendChild(handle);
+
+  let startAngle = 0;
+  let startX, startY;
+
+  handle.onmousedown = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const rect = div.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    startX = e.clientX;
+    startY = e.clientY;
+    startAngle = getRotationAngle(div);
+
+    function onMouseMove(ev) {
+      const dx = ev.clientX - centerX;
+      const dy = ev.clientY - centerY;
+      let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      angle = angle < 0 ? 360 + angle : angle;
+
+      let rotation = angle; // Or adjust relative to startAngle if needed
+      div.style.transform = `rotate(${rotation}deg)`;
+    }
+
+    function onMouseUp() {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    }
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  };
+}
+
+function removeRotateHandle(div) {
+  const handle = div.querySelector(".rotate-handle");
+  if (handle) div.removeChild(handle);
+}
+
+function getRotationAngle(el) {
+  const st = window.getComputedStyle(el, null);
+  const tr = st.getPropertyValue("transform");
+  if (tr === "none") return 0;
+  const values = tr.split('(')[1].split(')')[0].split(',');
+  const a = values[0];
+  const b = values[1];
+  const angle = Math.round(Math.atan2(b, a) * (180/Math.PI));
+  return angle < 0 ? angle + 360 : angle;
+}
+
+// Make selected text draggable
+document.addEventListener("mousedown", function(e) {
+  if (!selectedTextBox) return;
+
+  if (!selectedTextBox.contains(e.target)) return;
+
+  if (e.target.classList.contains("rotate-handle")) return; // skip rotate handle drag
+
+  e.preventDefault();
+
+  let shiftX = e.clientX - selectedTextBox.getBoundingClientRect().left;
+  let shiftY = e.clientY - selectedTextBox.getBoundingClientRect().top;
+
+  function moveAt(pageX, pageY) {
+    selectedTextBox.style.left = pageX - shiftX + "px";
+    selectedTextBox.style.top = pageY - shiftY + "px";
   }
 
-  function addText() {
-    const canvas = document.getElementById("canvas");
-    const text = document.getElementById("textInput").value;
-    const font = document.getElementById("fontSelect").value;
-    const size = document.getElementById("fontSize").value;
-    const color = document.getElementById("textColor").value;
-
-    const div = document.createElement("div");
-    div.className = "text-box";
-    div.contentEditable = true;
-    div.innerText = text;
-
-    div.style.fontFamily = font;
-    div.style.fontSize = size + "px";
-    div.style.color = color;
-    div.style.left = "100px";
-    div.style.top = "100px";
-
-    // Make it draggable
-    div.onmousedown = function (e) {
-      let shiftX = e.clientX - div.getBoundingClientRect().left;
-      let shiftY = e.clientY - div.getBoundingClientRect().top;
-
-      function moveAt(pageX, pageY) {
-        div.style.left = pageX - shiftX + "px";
-        div.style.top = pageY - shiftY + "px";
-      }
-
-      function onMouseMove(e) {
-        moveAt(e.pageX, e.pageY);
-      }
-
-      document.addEventListener("mousemove", onMouseMove);
-
-      div.onmouseup = function () {
-        document.removeEventListener("mousemove", onMouseMove);
-        div.onmouseup = null;
-      };
-    };
-
-    div.ondragstart = () => false;
-
-    canvas.appendChild(div);
+  function onMouseMove(event) {
+    moveAt(event.pageX, event.pageY);
   }
+
+  document.addEventListener("mousemove", onMouseMove);
+
+  document.addEventListener("mouseup", function onMouseUp() {
+    document.removeEventListener("mousemove", onMouseMove);
+    document.removeEventListener("mouseup", onMouseUp);
+  });
+});
+
+// Select text box on click
+canvas.addEventListener("click", (e) => {
+  if (e.target.classList.contains("text-box")) {
+    selectTextBox(e.target);
+  } else if (!addingTextMode) {
+    deselectAll();
+  }
+});
+
 </script>
-
 </body>
 </html>
+
