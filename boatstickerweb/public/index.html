@@ -39,83 +39,84 @@
   </section>
 
   <script>
-const uploadBtn = document.getElementById("uploadBtn");
-const boatUpload = document.getElementById("boatUpload");
-const editBtn = document.getElementById("editBtn");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const boatUpload = document.getElementById("boatUpload");
+    const editBtn = document.getElementById("editBtn");
 
-const resultContainer = document.createElement("div");
-resultContainer.classList.add("result-container");
-document.querySelector(".hero").appendChild(resultContainer);
+    // Create result container once, add class for styling
+    const resultContainer = document.createElement("div");
+    resultContainer.classList.add("result-container");
+    document.querySelector(".hero").appendChild(resultContainer);
 
-uploadBtn.addEventListener("click", () => boatUpload.click());
+    uploadBtn.addEventListener("click", () => boatUpload.click());
 
-boatUpload.addEventListener("change", async () => {
-  if (boatUpload.files.length === 0) return;
+    boatUpload.addEventListener("change", async () => {
+      if (boatUpload.files.length === 0) return;
 
-  const file = boatUpload.files[0];
-  resultContainer.innerHTML = `
-    <div class="loading-container">
-      <div class="spinner"></div>
-      <p>Uploading and generating image for <strong>${file.name}</strong>.<br/>
-      This can take up to 2 minutes. Please wait...</p>
-    </div>
-  `;
+      const file = boatUpload.files[0];
+      resultContainer.innerHTML = `
+        <div class="loading-container">
+          <div class="spinner"></div>
+          <p>Uploading and generating image for <strong>${file.name}</strong>.<br/>
+          This can take up to 2 minutes. Please wait...</p>
+        </div>
+      `;
 
-  const formData = new FormData();
-  formData.append("boatImage", file);
+      const formData = new FormData();
+      formData.append("boatImage", file);
 
-  try {
-    const uploadResp = await fetch("/generate-image", {
-      method: "POST",
-      body: formData,
-    });
+      try {
+        const uploadResp = await fetch("/generate-image", {
+          method: "POST",
+          body: formData,
+        });
 
-    if (!uploadResp.ok) throw new Error("Upload failed");
+        if (!uploadResp.ok) throw new Error("Upload failed");
 
-    const { prediction } = await uploadResp.json();
-    const predictionId = prediction?.id;
-    if (!predictionId) throw new Error("No prediction ID returned");
+        const { prediction } = await uploadResp.json();
+        const predictionId = prediction?.id;
+        if (!predictionId) throw new Error("No prediction ID returned");
 
-    const pollInterval = 2000; // ms
-    const maxAttempts = 30;
-    let attempts = 0;
+        const pollInterval = 2000; // ms
+        const maxAttempts = 30;
+        let attempts = 0;
 
-    async function poll() {
-      attempts++;
-      const statusResp = await fetch(`/prediction-status/${predictionId}`);
-      const statusData = await statusResp.json();
+        async function poll() {
+          attempts++;
+          const statusResp = await fetch(`/prediction-status/${predictionId}`);
+          const statusData = await statusResp.json();
 
-      if (statusData.status === "succeeded" && statusData.output?.length) {
-        const imageUrl = statusData.output[0];
-        resultContainer.innerHTML = `
-          <p>Your AI-generated drawing:</p>
-          <img src="${imageUrl}" alt="AI generated boat drawing" class="ai-output" />
-          <br/>
-          <a href="${imageUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
-        `;
+          if (statusData.status === "succeeded" && statusData.output?.length) {
+            const imageUrl = statusData.output[0];
+            resultContainer.innerHTML = `
+              <p>Your AI-generated drawing:</p>
+              <img src="${imageUrl}" alt="AI generated boat drawing" class="ai-output" />
+              <br/>
+              <a href="${imageUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
+            `;
 
-        editBtn.style.display = "inline-block";
-        editBtn.onclick = () => {
-          window.location.href = "edit.html?img=" + encodeURIComponent(imageUrl);
-        };
+            editBtn.style.display = "inline-block";
+            editBtn.onclick = () => {
+              window.location.href = "edit.html?img=" + encodeURIComponent(imageUrl);
+            };
 
-      } else if (statusData.status === "failed") {
-        resultContainer.innerHTML = `<p>AI generation failed. Please try again.</p>`;
-      } else {
-        if (attempts < maxAttempts) {
-          setTimeout(poll, pollInterval);
-        } else {
-          resultContainer.innerHTML = `<p>Generation timed out. Please try again later.</p>`;
+          } else if (statusData.status === "failed") {
+            resultContainer.innerHTML = `<p>AI generation failed. Please try again.</p>`;
+          } else {
+            if (attempts < maxAttempts) {
+              setTimeout(poll, pollInterval);
+            } else {
+              resultContainer.innerHTML = `<p>Generation timed out. Please try again later.</p>`;
+            }
+          }
         }
-      }
-    }
 
-    poll();
-  } catch (error) {
-    console.error(error);
-    resultContainer.innerHTML = `<p>Error: ${error.message}</p>`;
-  }
-});
+        poll();
+      } catch (error) {
+        console.error(error);
+        resultContainer.innerHTML = `<p>Error: ${error.message}</p>`;
+      }
+    });
   </script>
 
   <!-- Features -->
@@ -148,4 +149,3 @@ boatUpload.addEventListener("change", async () => {
 
 </body>
 </html>
-
