@@ -260,8 +260,12 @@ nav a.active {
   border-radius: 8px;
   margin: 20px auto;
   display: block;
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 0 12px rgba(255, 152, 0, 0.8),
+    0 0 20px rgba(255, 152, 0, 0.6);
+  transition: box-shadow 0.3s ease-in-out;
 }
+
 
 .editor-container {
   max-width: 800px;
@@ -330,3 +334,4 @@ nav a.active {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
