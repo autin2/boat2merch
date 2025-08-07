@@ -43,10 +43,8 @@
     const boatUpload = document.getElementById("boatUpload");
     const editBtn = document.getElementById("editBtn");
 
-    // Create result container hidden initially
     const resultContainer = document.createElement("div");
-    resultContainer.classList.add("result-container");
-    resultContainer.style.display = "none";  // hidden at start
+    resultContainer.style.marginTop = "20px";
     document.querySelector(".hero").appendChild(resultContainer);
 
     uploadBtn.addEventListener("click", () => boatUpload.click());
@@ -54,22 +52,20 @@
     boatUpload.addEventListener("change", async () => {
       if (boatUpload.files.length === 0) return;
 
-      // Show container when upload starts
-      resultContainer.style.display = "block";
-
       const file = boatUpload.files[0];
-      resultContainer.innerHTML = `
+      resultContainer.innerHTML = 
         <div class="loading-container">
           <div class="spinner"></div>
           <p>Uploading and generating image for <strong>${file.name}</strong>.<br/>
           This can take up to 2 minutes. Please wait...</p>
         </div>
-      `;
+      ;
 
       const formData = new FormData();
       formData.append("boatImage", file);
 
       try {
+        // Start prediction
         const uploadResp = await fetch("/generate-image", {
           method: "POST",
           body: formData,
@@ -81,36 +77,38 @@
         const predictionId = prediction?.id;
         if (!predictionId) throw new Error("No prediction ID returned");
 
-        const pollInterval = 2000;
+        // Poll function
+        const pollInterval = 2000; // ms
         const maxAttempts = 30;
         let attempts = 0;
 
         async function poll() {
           attempts++;
-          const statusResp = await fetch(`/prediction-status/${predictionId}`);
+          const statusResp = await fetch(/prediction-status/${predictionId});
           const statusData = await statusResp.json();
 
           if (statusData.status === "succeeded" && statusData.output?.length) {
             const imageUrl = statusData.output[0];
-            resultContainer.innerHTML = `
+            resultContainer.innerHTML = 
               <p>Your AI-generated drawing:</p>
               <img src="${imageUrl}" alt="AI generated boat drawing" class="ai-output" />
               <br/>
               <a href="${imageUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
-            `;
+            ;
 
+            // Show and configure Edit button
             editBtn.style.display = "inline-block";
             editBtn.onclick = () => {
               window.location.href = "edit.html?img=" + encodeURIComponent(imageUrl);
             };
 
           } else if (statusData.status === "failed") {
-            resultContainer.innerHTML = `<p>AI generation failed. Please try again.</p>`;
+            resultContainer.innerHTML = <p>AI generation failed. Please try again.</p>;
           } else {
             if (attempts < maxAttempts) {
               setTimeout(poll, pollInterval);
             } else {
-              resultContainer.innerHTML = `<p>Generation timed out. Please try again later.</p>`;
+              resultContainer.innerHTML = <p>Generation timed out. Please try again later.</p>;
             }
           }
         }
@@ -118,7 +116,7 @@
         poll();
       } catch (error) {
         console.error(error);
-        resultContainer.innerHTML = `<p>Error: ${error.message}</p>`;
+        resultContainer.innerHTML = <p>Error: ${error.message}</p>;
       }
     });
   </script>
