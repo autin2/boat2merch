@@ -262,3 +262,31 @@ nav a.active {
   display: block;
   box-shadow: 0 0 12px rgba(255, 255, 255, 0.1);
 }
+
+.editor-container {
+  max-width: 800px;
+  margin: 40px auto;
+  text-align: center;
+}
+
+.editor-container img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.btn-product {
+  background: #03a9f4;
+  color: #121212;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin: 5px;
+}
+
+.btn-product:hover {
+  background: #0288d1;
+}
+
+
