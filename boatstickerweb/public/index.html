@@ -47,6 +47,9 @@
     resultContainer.style.marginTop = "20px";
     document.querySelector(".hero").appendChild(resultContainer);
 
+    // Simulate user status (replace with your real auth/user check)
+    const isPaidUser = false; // true = no overlay, false = overlay shown
+
     uploadBtn.addEventListener("click", () => boatUpload.click());
 
     boatUpload.addEventListener("change", async () => {
@@ -54,11 +57,11 @@
 
       const file = boatUpload.files[0];
       resultContainer.innerHTML = `
-  <div class="loading-container">
-    <div class="spinner"></div>
-    <p>Uploading and generating image for <strong>${file.name}</strong>.<br/>This can take up to 2 minutes. Please wait...</p>
-  </div>
-`;
+        <div class="loading-container">
+          <div class="spinner"></div>
+          <p>Uploading and generating image for <strong>${file.name}</strong>.<br/>This can take up to 2 minutes. Please wait...</p>
+        </div>
+      `;
 
       const formData = new FormData();
       formData.append("boatImage", file);
@@ -88,9 +91,13 @@
 
           if (statusData.status === "succeeded" && statusData.output?.length) {
             const imageUrl = statusData.output[0];
+
             resultContainer.innerHTML = `
               <p>Your AI-generated drawing:</p>
-              <img src="${imageUrl}" alt="AI generated boat drawing" class="ai-output" />
+              <div class="image-wrapper">
+                <img src="${imageUrl}" alt="AI generated boat drawing" class="ai-output" />
+                ${!isPaidUser ? '<img src="overlay.png" alt="Free Trial Overlay" class="overlay" />' : ''}
+              </div>
               <br/>
               <a href="${imageUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
             `;
@@ -150,4 +157,3 @@
 
 </body>
 </html>
-
