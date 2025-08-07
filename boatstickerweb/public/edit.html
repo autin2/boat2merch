@@ -5,119 +5,95 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Edit Your Boat Design</title>
   <link rel="stylesheet" href="style.css" />
- <style>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 20px;
+    }
 
-   body {
-  font-family: Arial, sans-serif;
-  background-color: #f4f4f4;
-  margin: 0;
-  padding: 20px;
-}
+    .editor-wrapper {
+      max-width: 900px;
+      margin: 0 auto;
+      text-align: center;
+    }
 
-.editor-container {
-  max-width: 900px;
-  margin: 0 auto;
-  text-align: center;
-}
+    #canvas {
+      position: relative;
+      display: inline-block;
+      border: 2px dashed #aaa;
+      margin-top: 20px;
+      background-color: white;
+      padding: 10px;
+    }
 
-#canvas {
-  position: relative;
-  display: inline-block;
-  border: 2px dashed #aaa;
-  margin-top: 20px;
-  background-color: white;
-  padding: 10px;
-}
+    #canvas img {
+      max-width: 100%;
+      display: block;
+    }
 
-#canvas img {
-  max-width: 100%;
-  display: block;
-}
+    .toolbox {
+      margin-bottom: 20px;
+    }
 
-.controls {
-  margin-bottom: 20px;
-}
+    .toolbox button {
+      background: #2196f3;
+      color: #fff;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 4px;
+      margin: 0 8px 8px 0;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
 
-.controls button {
-  background: #2196f3;
-  color: #fff;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 4px;
-  margin: 0 8px 8px 0;
-  cursor: pointer;
-  transition: background 0.2s;
-}
+    .toolbox button:hover {
+      background: #1976d2;
+    }
 
-.controls button:hover {
-  background: #1976d2;
-}
+    .text-box {
+      position: absolute;
+      font-size: 24px;
+      font-family: Arial, sans-serif;
+      color: black;
+      background: transparent;
+      cursor: move;
+      user-select: none;
+      padding: 4px 8px;
+      white-space: pre;
+    }
 
-.btn-product {
-  background: #03a9f4;
-  color: #121212;
-  padding: 12px 20px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  margin: 5px;
-}
+    .text-box:focus {
+      outline: none;
+    }
 
-.btn-product:hover {
-  background: #0288d1;
-}
+    .text-box.selected {
+      outline: 2px solid #2196f3;
+    }
 
-.text-box {
-  position: absolute;
-  font-size: 24px;
-  font-family: Arial, sans-serif;
-  color: black;
-  background: transparent;
-  cursor: move;
-  user-select: none;
-  padding: 4px 8px;
-  white-space: pre;
-}
+    .bottom-buttons button {
+      background: #03a9f4;
+      color: #fff;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 5px;
+    }
 
-.text-box:focus {
-  outline: none;
-}
-
-.text-box.selected {
-  outline: 2px solid #2196f3;
-}
-
-   
- </style>
+    .bottom-buttons button:hover {
+      background: #0288d1;
+    }
+  </style>
 </head>
 <body>
 
 <div class="editor-wrapper">
-  <!-- Left Panel / Toolbox -->
   <div class="toolbox">
-    <h2>Tools</h2>
-    <label for="textInput">Add Text:</label>
-    <input type="text" id="textInput" placeholder="Enter your text" />
-
-    <label for="fontSelect">Font:</label>
-    <select id="fontSelect">
-      <option value="Arial">Arial</option>
-      <option value="Comic Sans MS">Comic Sans</option>
-      <option value="Impact">Impact</option>
-      <option value="Georgia">Georgia</option>
-      <option value="Courier New">Courier</option>
-    </select>
-
-    <label for="fontSize">Font Size:</label>
-    <input type="number" id="fontSize" value="24" />
-
-    <label for="textColor">Text Color:</label>
-    <input type="color" id="textColor" value="#000000" />
-
-    <button onclick="addText()">Add Text</button>
+    <button id="addTextBtn">Add Text</button>
   </div>
 
-  <!-- Right Side / Canvas -->
   <div class="editor-canvas" id="canvas">
     <img id="preview" src="" alt="AI-generated boat image" />
     <div class="bottom-buttons">
@@ -164,8 +140,9 @@
 
       box.addEventListener("mousedown", (e) => {
         selectedBox = box;
-        offsetX = e.offsetX;
-        offsetY = e.offsetY;
+        const boxRect = box.getBoundingClientRect();
+        offsetX = e.clientX - boxRect.left;
+        offsetY = e.clientY - boxRect.top;
         document.body.style.cursor = "move";
         selectBox(box);
         e.stopPropagation();
@@ -200,6 +177,12 @@
     document.body.style.cursor = "default";
   });
 
+  document.addEventListener("click", (e) => {
+    if (!e.target.classList.contains("text-box")) {
+      deselectAll();
+    }
+  });
+
   function deselectAll() {
     const boxes = document.querySelectorAll(".text-box");
     boxes.forEach((box) => box.classList.remove("selected"));
@@ -211,8 +194,5 @@
   }
 </script>
 
-  
 </body>
 </html>
-
-
