@@ -343,6 +343,10 @@ nav a.active {
   max-width: 400px;
   width: 90%;
   margin: 20px auto;
+
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
 }
 
 .image-wrapper .ai-output {
@@ -368,5 +372,6 @@ nav a.active {
   pointer-events: none;
   user-select: none;
 }
+
 
 
