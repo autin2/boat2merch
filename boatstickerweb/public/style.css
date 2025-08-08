@@ -254,7 +254,7 @@ nav a.active {
 }
 
 .ai-output {
-  max-width: 400px;
+  max-width: 500px;
   width: 90%;
   height: auto;
   border-radius: 8px;
@@ -368,4 +368,5 @@ nav a.active {
   pointer-events: none;
   user-select: none;
 }
+
 
