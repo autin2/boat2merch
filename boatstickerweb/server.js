@@ -251,11 +251,12 @@ app.post(
       `;
 
       const mailOptions = {
-        from: `"Your Store" <${SMTP_USER}>`,
-        to: EMAIL_TO,
-        subject: `New Sticker Order from ${buyerName}`,
-        html: emailHtml,
-      };
+  from: `"boat2merch" <${SMTP_USER}>`,
+  to: "charliebrayton8@gmail.com", // <-- Your email address
+  subject: `New Sticker Order from ${buyerName}`,
+  html: emailHtml,
+};
+
 
       transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
@@ -272,3 +273,4 @@ app.post(
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
