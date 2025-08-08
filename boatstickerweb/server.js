@@ -38,7 +38,7 @@ const transporter = nodemailer.createTransport({
 // Serve static files from "public"
 app.use(express.static("public"));
 
-// Use raw body parser for webhook verification, JSON otherwise
+// Use express.json for general routes but keep raw body for webhook
 app.use(
   express.json({
     verify: (req, res, buf) => {
@@ -134,7 +134,7 @@ app.get("/prediction-status/:id", async (req, res) => {
   }
 });
 
-// Helper to create Printful order (not currently used for manual fulfillment)
+// Helper to create Printful order (not currently used)
 async function createPrintfulOrder(orderData) {
   const response = await fetch("https://api.printful.com/orders", {
     method: "POST",
@@ -153,7 +153,7 @@ async function createPrintfulOrder(orderData) {
   return response.json();
 }
 
-// Create Stripe Checkout Session endpoint with imageUrl metadata
+// Create Stripe Checkout Session endpoint with metadata
 app.post("/create-checkout-session", async (req, res) => {
   try {
     const { email, imageUrl, name, address } = req.body;
@@ -197,7 +197,7 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// Placeholder /create-order endpoint (optional)
+// Placeholder /create-order endpoint
 app.post("/create-order", async (req, res) => {
   try {
     res.json({ message: "Order processing placeholder" });
@@ -207,64 +207,68 @@ app.post("/create-order", async (req, res) => {
   }
 });
 
-// Stripe webhook endpoint to send you an email on purchase
-app.post("/webhook", express.raw({ type: "application/json" }), (req, res) => {
-  const sig = req.headers["stripe-signature"];
+// Stripe webhook endpoint to send order email on purchase
+app.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  (req, res) => {
+    const sig = req.headers["stripe-signature"];
 
-  let event;
-  try {
-    event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    console.error("⚠️ Webhook signature verification failed.", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-
-    const buyerEmail = session.customer_email || "unknown";
-    const imageUrl = session.metadata?.imageUrl || "";
-    const buyerName = session.metadata?.buyerName || "Customer";
-    let buyerAddress = {};
+    let event;
     try {
-      buyerAddress = JSON.parse(session.metadata?.buyerAddress || "{}");
-    } catch {
-      buyerAddress = {};
+      event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+      console.error("⚠️ Webhook signature verification failed.", err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // Compose the email HTML content
-    const emailHtml = `
-      <h2>New Sticker Order</h2>
-      <p><strong>Buyer Name:</strong> ${buyerName}</p>
-      <p><strong>Buyer Email:</strong> ${buyerEmail}</p>
-      <p><strong>Address:</strong><br/>
-        ${buyerAddress.line1 || ""}<br/>
-        ${buyerAddress.city || ""}, ${buyerAddress.state || ""} ${buyerAddress.postal_code || buyerAddress.zip || ""}<br/>
-        ${buyerAddress.country || ""}
-      </p>
-      <p><strong>Sticker Image:</strong></p>
-      <img src="${imageUrl}" alt="Purchased Sticker" style="max-width:300px; border:1px solid #ccc; border-radius:6px;" />
-      <p>View order details in Stripe Dashboard.</p>
-    `;
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
 
-    const mailOptions = {
-      from: `"Your Store" <${SMTP_USER}>`,
-      to: EMAIL_TO,
-      subject: `New Sticker Order from ${buyerName}`,
-      html: emailHtml,
-    };
-
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.error("❌ Error sending order email:", error);
-      } else {
-        console.log("✅ Order email sent:", info.response);
+      const buyerEmail = session.customer_email || "unknown";
+      const imageUrl = session.metadata?.imageUrl || "";
+      const buyerName = session.metadata?.buyerName || "Customer";
+      let buyerAddress = {};
+      try {
+        buyerAddress = JSON.parse(session.metadata?.buyerAddress || "{}");
+      } catch {
+        buyerAddress = {};
       }
-    });
-  }
 
-  res.json({ received: true });
-});
+      // Compose email content
+      const emailHtml = `
+        <h2>New Sticker Order</h2>
+        <p><strong>Buyer Name:</strong> ${buyerName}</p>
+        <p><strong>Buyer Email:</strong> ${buyerEmail}</p>
+        <p><strong>Address:</strong><br/>
+          ${buyerAddress.line1 || ""}<br/>
+          ${buyerAddress.city || ""}, ${buyerAddress.state || ""} ${buyerAddress.postal_code || buyerAddress.zip || ""}<br/>
+          ${buyerAddress.country || ""}
+        </p>
+        <p><strong>Sticker Image:</strong></p>
+        <img src="${imageUrl}" alt="Purchased Sticker" style="max-width:300px; border:1px solid #ccc; border-radius:6px;" />
+        <p>View order details in Stripe Dashboard.</p>
+      `;
+
+      const mailOptions = {
+        from: `"Your Store" <${SMTP_USER}>`,
+        to: EMAIL_TO,
+        subject: `New Sticker Order from ${buyerName}`,
+        html: emailHtml,
+      };
+
+      transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+          console.error("❌ Error sending order email:", error);
+        } else {
+          console.log("✅ Order email sent:", info.response);
+        }
+      });
+    }
+
+    res.json({ received: true });
+  }
+);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
