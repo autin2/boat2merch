@@ -17,16 +17,15 @@ const PRINTFUL_API_KEY = process.env.PRINTFUL_API_KEY;
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
 app.use(express.static("public"));
-app.use(express.json()); // to parse JSON bodies for /create-order
+app.use(express.json()); // parse JSON bodies
 
-// Upload & generate image endpoint
+// Upload & generate image endpoint (unchanged)
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
   try {
     console.log("📂 Received file:", req.file);
 
-    // Upload the file to tmpfiles.org
     const form = new FormData();
     form.append("file", fs.createReadStream(req.file.path), req.file.originalname);
 
@@ -44,14 +43,12 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       return res.status(500).json({ error: "No URL returned from tmpfiles" });
     }
 
-    // Convert URL to direct download link if needed
     let imageUrl = uploadData.data.url;
     if (!imageUrl.includes("/dl/")) {
       imageUrl = imageUrl.replace("tmpfiles.org/", "tmpfiles.org/dl/");
     }
     console.log("🔗 Direct image URL for AI:", imageUrl);
 
-    // Call Replicate API to generate the image with updated prompt
     console.log(`🚀 Calling Replicate model: openai/gpt-image-1`);
     const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
@@ -94,7 +91,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   }
 });
 
-// Poll prediction status endpoint
+// Poll prediction status endpoint (unchanged)
 app.get("/prediction-status/:id", async (req, res) => {
   try {
     const predictionId = req.params.id;
@@ -109,7 +106,7 @@ app.get("/prediction-status/:id", async (req, res) => {
   }
 });
 
-// Helper to create Printful order
+// Helper to create Printful order (unchanged)
 async function createPrintfulOrder(orderData) {
   const response = await fetch("https://api.printful.com/orders", {
     method: "POST",
@@ -128,58 +125,50 @@ async function createPrintfulOrder(orderData) {
   return response.json();
 }
 
-// Create order + process payment endpoint
-app.post("/create-order", async (req, res) => {
+// New endpoint: Create Stripe Checkout Session
+app.post("/create-checkout-session", async (req, res) => {
   try {
-    const { email, name, address, imageUrl, paymentMethodId } = req.body;
-    if (!email || !name || !address || !imageUrl || !paymentMethodId) {
+    const { email, imageUrl, name, address } = req.body;
+    if (!email || !imageUrl || !name || !address) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // 1. Create PaymentIntent with Stripe
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: 1500, // $15.00 in cents — adjust as needed
-      currency: "usd",
-      payment_method: paymentMethodId,
-      confirmation_method: "manual",
-      confirm: true,
-      receipt_email: email,
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: "Boat Sticker",
+              images: [imageUrl],
+            },
+            unit_amount: 1500, // $15.00 in cents
+          },
+          quantity: 1,
+        },
+      ],
+      mode: "payment",
+      customer_email: email,
+      shipping_address_collection: {
+        allowed_countries: ["US", "CA"], // adjust allowed countries as needed
+      },
+      success_url: "https://yourdomain.com/success?session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: "https://yourdomain.com/cancel",
     });
 
-    if (paymentIntent.status === "requires_action") {
-      // Card requires authentication (3D Secure)
-      return res.json({
-        requiresAction: true,
-        paymentIntentClientSecret: paymentIntent.client_secret,
-      });
-    } else if (paymentIntent.status === "succeeded") {
-      // Payment successful, create Printful order
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error("❌ /create-checkout-session error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
-      const printfulOrder = {
-        recipient: {
-          name,
-          address1: address.line1,
-          city: address.city,
-          state_code: address.state,
-          country_code: address.country,
-          zip: address.zip,
-          email,
-        },
-        items: [
-          {
-            variant_id: 4011, // example Printful sticker variant - verify on your Printful dashboard
-            quantity: 1,
-            files: [{ url: imageUrl }],
-          },
-        ],
-      };
-
-      const printfulResp = await createPrintfulOrder(printfulOrder);
-
-      return res.json({ success: true, printfulOrder: printfulResp });
-    } else {
-      return res.status(400).json({ error: "Payment failed" });
-    }
+// Optional: You can keep this endpoint for webhook or backend order creation after payment confirmation
+app.post("/create-order", async (req, res) => {
+  try {
+    // You can implement webhook logic or process fulfilled orders here
+    res.json({ message: "Order processing placeholder" });
   } catch (err) {
     console.error("❌ /create-order error:", err);
     res.status(500).json({ error: err.message });
