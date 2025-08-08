@@ -3,94 +3,172 @@
 <head>
   <meta charset="UTF-8" />
   <title>Buy Your Sticker</title>
-  <script src="https://js.stripe.com/v3/"></script> <!-- For payments -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://js.stripe.com/v3/"></script> <!-- Stripe.js -->
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 400px;
+      margin: 30px auto;
+      padding: 0 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 10px;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+      margin-top: 4px;
+    }
+    #card-element {
+      padding: 10px 0;
+    }
+    button {
+      margin-top: 15px;
+      padding: 12px;
+      font-size: 16px;
+      width: 100%;
+      background-color: #6772e5;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    img {
+      display: block;
+      margin: 20px auto;
+      max-width: 300px;
+      max-height: 300px;
+      object-fit: contain;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+  </style>
 </head>
 <body>
   <h1>Buy Your Sticker</h1>
-  <img id="product-image" alt="Sticker preview" style="max-width:300px;" />
-  
- <form id="purchase-form">
-  <label>Email: <input type="email" id="email" required /></label><br/>
-  <label>Name: <input type="text" id="name" required /></label><br/>
-  <label>Address: <textarea id="address" required></textarea></label><br/>
-  <label>City: <input type="text" id="city" required /></label><br/>
-  <label>State: <input type="text" id="state" required /></label><br/>
-  <label>Country: <input type="text" id="country" required /></label><br/>
-  <label>ZIP: <input type="text" id="zip" required /></label><br/>
-  <div id="card-element"></div><br/>
-  <button type="submit">Buy Now</button>
-</form>
+  <img id="product-image" alt="Sticker preview" />
 
+  <form id="purchase-form">
+    <label>
+      Email:
+      <input type="email" id="email" required />
+    </label>
+
+    <label>
+      Name:
+      <input type="text" id="name" required />
+    </label>
+
+    <label>
+      Address:
+      <textarea id="address" rows="3" required></textarea>
+    </label>
+
+    <label>
+      City:
+      <input type="text" id="city" required />
+    </label>
+
+    <label>
+      State:
+      <input type="text" id="state" required />
+    </label>
+
+    <label>
+      Country:
+      <input type="text" id="country" required />
+    </label>
+
+    <label>
+      ZIP:
+      <input type="text" id="zip" required />
+    </label>
+
+    <div id="card-element"></div>
+
+    <button type="submit">Buy Now</button>
+  </form>
 
   <script>
-     const stripe = Stripe('pk_test_51Rtdm5Rs1Dqo8huI8J7T5tdhVHYCy0gq2tBd03m4HcbvjrdpmOwA3hTDlSK57RL7yKO9cNdhO6sROnUxDAa6fmKy00BRvR5iRw');
-const elements = stripe.elements();
-const card = elements.create('card');
-card.mount('#card-element');
+    // Initialize Stripe with your publishable key
+    const stripe = Stripe('pk_test_51Rtdm5Rs1Dqo8huI8J7T5tdhVHYCy0gq2tBd03m4HcbvjrdpmOwA3hTDlSK57RL7yKO9cNdhO6sROnUxDAa6fmKy00BRvR5iRw');
+    const elements = stripe.elements();
+    const card = elements.create('card');
+    card.mount('#card-element');
 
-const form = document.getElementById('purchase-form');
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const email = document.getElementById('email').value;
-  const name = document.getElementById('name').value;
-  const address = {
-    line1: document.getElementById('address').value,
-    city: document.getElementById('city').value,
-    state: document.getElementById('state').value,
-    country: document.getElementById('country').value,
-    zip: document.getElementById('zip').value,
-  };
-
-  // 1. Create payment method
-  const { paymentMethod, error } = await stripe.createPaymentMethod({
-    type: 'card',
-    card: card,
-    billing_details: { email, name, address },
-  });
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  // 2. Send order + paymentMethod.id to backend
-  const response = await fetch('/create-order', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      name,
-      address,
-      imageUrl: document.getElementById('product-image').src,
-      paymentMethodId: paymentMethod.id,
-    }),
-  });
-
-  const result = await response.json();
-
-  if (result.error) {
-    alert('Error: ' + result.error);
-    return;
-  }
-
-  if (result.requiresAction) {
-    // Handle 3D Secure auth
-    const { error: confirmError } = await stripe.confirmCardPayment(result.paymentIntentClientSecret);
-    if (confirmError) {
-      alert('Payment failed: ' + confirmError.message);
-      return;
+    // Set product image from URL query param (e.g. buy.html?img=IMAGE_URL)
+    const urlParams = new URLSearchParams(window.location.search);
+    const imgUrl = urlParams.get('img');
+    if (imgUrl) {
+      const productImage = document.getElementById('product-image');
+      productImage.src = imgUrl;
     }
-    alert('Payment succeeded!');
-  } else {
-    alert('Payment succeeded! Order placed.');
-  }
 
-  // Optionally redirect or show order confirmation UI here
-});
+    // Handle form submit
+    const form = document.getElementById('purchase-form');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
 
+      // Collect form values
+      const email = document.getElementById('email').value.trim();
+      const name = document.getElementById('name').value.trim();
+      const address = {
+        line1: document.getElementById('address').value.trim(),
+        city: document.getElementById('city').value.trim(),
+        state: document.getElementById('state').value.trim(),
+        country: document.getElementById('country').value.trim(),
+        postal_code: document.getElementById('zip').value.trim(),
+      };
+
+      // Create payment method
+      const { paymentMethod, error } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: card,
+        billing_details: { email, name, address },
+      });
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
+
+      // Send order + paymentMethod.id to backend
+      const response = await fetch('/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          name,
+          address,
+          imageUrl: imgUrl || '',
+          paymentMethodId: paymentMethod.id,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.error) {
+        alert('Error: ' + result.error);
+        return;
+      }
+
+      if (result.requiresAction) {
+        // Handle 3D Secure authentication
+        const { error: confirmError } = await stripe.confirmCardPayment(result.paymentIntentClientSecret);
+        if (confirmError) {
+          alert('Payment failed: ' + confirmError.message);
+          return;
+        }
+        alert('Payment succeeded!');
+      } else {
+        alert('Payment succeeded! Order placed.');
+      }
+
+      // TODO: redirect to thank you page or clear form
+    });
   </script>
 </body>
 </html>
-
-
