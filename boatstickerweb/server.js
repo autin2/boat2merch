@@ -38,14 +38,14 @@ const transporter = nodemailer.createTransport({
 // Serve static files from "public"
 app.use(express.static("public"));
 
-// Use express.json for general routes but keep raw body for webhook
-app.use(
-  express.json({
-    verify: (req, res, buf) => {
-      req.rawBody = buf.toString();
-    },
-  })
-);
+// Use JSON parser only on non-webhook routes
+app.use((req, res, next) => {
+  if (req.originalUrl === "/webhook") {
+    next(); // skip JSON parsing for webhook
+  } else {
+    express.json()(req, res, next); // parse JSON for other routes
+  }
+});
 
 // Upload & generate image endpoint
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
@@ -171,7 +171,7 @@ app.post("/create-checkout-session", async (req, res) => {
               name: "Boat Sticker",
               images: [imageUrl],
             },
-            unit_amount: 100, // $1.00 in cents
+            unit_amount: 100, // $1.00 in cents, update as needed
           },
           quantity: 1,
         },
@@ -252,7 +252,7 @@ app.post(
 
       const mailOptions = {
         from: `"boat2merch" <${SMTP_USER}>`,
-        to: "charliebrayton8@gmail.com", // <-- Your email address
+        to: "charliebrayton8@gmail.com", // Your email address here
         subject: `New Sticker Order from ${buyerName}`,
         html: emailHtml,
       };
