@@ -4,22 +4,50 @@ import fetch from "node-fetch";
 import FormData from "form-data";
 import fs from "fs";
 import Stripe from "stripe";
+import nodemailer from "nodemailer";
 
 const app = express();
 const upload = multer({ dest: "uploads/" });
 
-// Environment variables (set in your hosting environment or locally)
-const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const PRINTFUL_API_KEY = process.env.PRINTFUL_API_KEY;
+const {
+  REPLICATE_API_TOKEN,
+  OPENAI_API_KEY,
+  STRIPE_SECRET_KEY,
+  PRINTFUL_API_KEY,
+  SMTP_HOST,
+  SMTP_PORT,
+  SMTP_USER,
+  SMTP_PASS,
+  EMAIL_TO,
+  STRIPE_WEBHOOK_SECRET,
+} = process.env;
 
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
-app.use(express.static("public"));
-app.use(express.json()); // parse JSON bodies
+// Nodemailer transporter for sending order notification emails
+const transporter = nodemailer.createTransport({
+  host: SMTP_HOST,
+  port: parseInt(SMTP_PORT, 10),
+  secure: SMTP_PORT === "465",
+  auth: {
+    user: SMTP_USER,
+    pass: SMTP_PASS,
+  },
+});
 
-// Upload & generate image endpoint (unchanged)
+// Serve static files from "public"
+app.use(express.static("public"));
+
+// Use raw body parser for webhook verification, JSON otherwise
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf.toString();
+    },
+  })
+);
+
+// Upload & generate image endpoint
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
@@ -91,7 +119,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   }
 });
 
-// Poll prediction status endpoint (unchanged)
+// Poll prediction status endpoint
 app.get("/prediction-status/:id", async (req, res) => {
   try {
     const predictionId = req.params.id;
@@ -106,7 +134,7 @@ app.get("/prediction-status/:id", async (req, res) => {
   }
 });
 
-// Helper to create Printful order (unchanged)
+// Helper to create Printful order (not currently used for manual fulfillment)
 async function createPrintfulOrder(orderData) {
   const response = await fetch("https://api.printful.com/orders", {
     method: "POST",
@@ -125,7 +153,7 @@ async function createPrintfulOrder(orderData) {
   return response.json();
 }
 
-// New endpoint: Create Stripe Checkout Session
+// Create Stripe Checkout Session endpoint with imageUrl metadata
 app.post("/create-checkout-session", async (req, res) => {
   try {
     const { email, imageUrl, name, address } = req.body;
@@ -151,7 +179,12 @@ app.post("/create-checkout-session", async (req, res) => {
       mode: "payment",
       customer_email: email,
       shipping_address_collection: {
-        allowed_countries: ["US", "CA"], // adjust allowed countries as needed
+        allowed_countries: ["US", "CA"],
+      },
+      metadata: {
+        imageUrl: imageUrl,
+        buyerName: name,
+        buyerAddress: JSON.stringify(address),
       },
       success_url: "https://yourdomain.com/success?session_id={CHECKOUT_SESSION_ID}",
       cancel_url: "https://yourdomain.com/cancel",
@@ -164,15 +197,73 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// Optional: You can keep this endpoint for webhook or backend order creation after payment confirmation
+// Placeholder /create-order endpoint (optional)
 app.post("/create-order", async (req, res) => {
   try {
-    // You can implement webhook logic or process fulfilled orders here
     res.json({ message: "Order processing placeholder" });
   } catch (err) {
     console.error("❌ /create-order error:", err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// Stripe webhook endpoint to send you an email on purchase
+app.post("/webhook", express.raw({ type: "application/json" }), (req, res) => {
+  const sig = req.headers["stripe-signature"];
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error("⚠️ Webhook signature verification failed.", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+
+    const buyerEmail = session.customer_email || "unknown";
+    const imageUrl = session.metadata?.imageUrl || "";
+    const buyerName = session.metadata?.buyerName || "Customer";
+    let buyerAddress = {};
+    try {
+      buyerAddress = JSON.parse(session.metadata?.buyerAddress || "{}");
+    } catch {
+      buyerAddress = {};
+    }
+
+    // Compose the email HTML content
+    const emailHtml = `
+      <h2>New Sticker Order</h2>
+      <p><strong>Buyer Name:</strong> ${buyerName}</p>
+      <p><strong>Buyer Email:</strong> ${buyerEmail}</p>
+      <p><strong>Address:</strong><br/>
+        ${buyerAddress.line1 || ""}<br/>
+        ${buyerAddress.city || ""}, ${buyerAddress.state || ""} ${buyerAddress.postal_code || buyerAddress.zip || ""}<br/>
+        ${buyerAddress.country || ""}
+      </p>
+      <p><strong>Sticker Image:</strong></p>
+      <img src="${imageUrl}" alt="Purchased Sticker" style="max-width:300px; border:1px solid #ccc; border-radius:6px;" />
+      <p>View order details in Stripe Dashboard.</p>
+    `;
+
+    const mailOptions = {
+      from: `"Your Store" <${SMTP_USER}>`,
+      to: EMAIL_TO,
+      subject: `New Sticker Order from ${buyerName}`,
+      html: emailHtml,
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.error("❌ Error sending order email:", error);
+      } else {
+        console.log("✅ Order email sent:", info.response);
+      }
+    });
+  }
+
+  res.json({ received: true });
 });
 
 const PORT = process.env.PORT || 3000;
