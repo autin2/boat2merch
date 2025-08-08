@@ -186,8 +186,8 @@ app.post("/create-checkout-session", async (req, res) => {
         buyerName: name,
         buyerAddress: JSON.stringify(address),
       },
-      success_url: "https://yourdomain.com/success?session_id={CHECKOUT_SESSION_ID}",
-      cancel_url: "https://yourdomain.com/cancel",
+      success_url: "https://boat2merch.com/thank-you.html?session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: "https://boat2merch.com",
     });
 
     res.json({ url: session.url });
@@ -272,3 +272,4 @@ app.post(
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
