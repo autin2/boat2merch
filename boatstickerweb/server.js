@@ -171,7 +171,7 @@ app.post("/create-checkout-session", async (req, res) => {
               name: "Boat Sticker",
               images: [imageUrl],
             },
-            unit_amount: 1500, // $15.00 in cents
+            unit_amount: 100, // $1.00 in cents
           },
           quantity: 1,
         },
@@ -251,12 +251,11 @@ app.post(
       `;
 
       const mailOptions = {
-  from: `"boat2merch" <${SMTP_USER}>`,
-  to: "charliebrayton8@gmail.com", // <-- Your email address
-  subject: `New Sticker Order from ${buyerName}`,
-  html: emailHtml,
-};
-
+        from: `"boat2merch" <${SMTP_USER}>`,
+        to: "charliebrayton8@gmail.com", // <-- Your email address
+        subject: `New Sticker Order from ${buyerName}`,
+        html: emailHtml,
+      };
 
       transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
@@ -273,4 +272,3 @@ app.post(
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
-
