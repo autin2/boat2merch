@@ -19,17 +19,6 @@
       align-items: center;
       min-height: 80vh;
     }
-    h1 {
-      color: #ff9800;
-      font-weight: 700;
-      letter-spacing: 1.2px;
-      margin-bottom: 30px;
-      text-align: center;
-      width: 100%;
-      position: absolute;
-      top: 20px;
-      left: 0;
-    }
     .container {
       display: flex;
       gap: 40px;
@@ -89,8 +78,19 @@
     .image-wrapper {
       flex: 1;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
+      justify-content: flex-start;
       align-items: center;
+      gap: 20px;
+    }
+    h1 {
+      color: #ff9800;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      margin: 0;
+      font-size: 2rem;
+      text-align: center;
+      user-select: none;
     }
     #product-image {
       max-width: 320px;
@@ -111,11 +111,6 @@
         flex-direction: column;
         padding: 30px 20px;
       }
-      h1 {
-        position: static;
-        margin-bottom: 20px;
-        text-align: center;
-      }
       .image-wrapper {
         margin-top: 30px;
       }
@@ -123,7 +118,6 @@
   </style>
 </head>
 <body>
-  <h1>Buy Your Sticker</h1>
 
   <div class="container">
     <form id="purchase-form" autocomplete="off">
@@ -159,6 +153,7 @@
     </form>
 
     <div class="image-wrapper">
+      <h1>Buy Your Sticker</h1>
       <img id="product-image" alt="Sticker preview" />
     </div>
   </div>
