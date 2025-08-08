@@ -23,7 +23,7 @@
 
 
   <script>
-     const stripe = Stripe('YOUR_STRIPE_PUBLISHABLE_KEY');
+     const stripe = Stripe('pk_test_51Rtdm5Rs1Dqo8huI8J7T5tdhVHYCy0gq2tBd03m4HcbvjrdpmOwA3hTDlSK57RL7yKO9cNdhO6sROnUxDAa6fmKy00BRvR5iRw');
 const elements = stripe.elements();
 const card = elements.create('card');
 card.mount('#card-element');
@@ -92,4 +92,5 @@ form.addEventListener('submit', async (e) => {
   </script>
 </body>
 </html>
+
 
