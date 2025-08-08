@@ -2,45 +2,78 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Buy Your Sticker</title>
+  <title>Buy Your Sticker - Boat2Merch</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://js.stripe.com/v3/"></script>
+  <link rel="stylesheet" href="style.css" />
   <style>
     body {
-      font-family: Arial, sans-serif;
       max-width: 400px;
-      margin: 30px auto;
+      margin: 40px auto;
       padding: 0 15px;
+      background: #121212;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
     }
-    label {
-      display: block;
-      margin-bottom: 10px;
+    h1 {
+      margin-bottom: 25px;
+      color: #ff9800;
+      font-weight: 700;
+      letter-spacing: 1.2px;
     }
-    input, textarea {
-      width: 100%;
-      padding: 8px;
-      box-sizing: border-box;
-      margin-top: 4px;
-    }
-    button {
-      margin-top: 15px;
-      padding: 12px;
-      font-size: 16px;
-      width: 100%;
-      background-color: #6772e5;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    img {
-      display: block;
-      margin: 20px auto;
+    img#product-image {
       max-width: 300px;
       max-height: 300px;
       object-fit: contain;
-      border: 1px solid #ccc;
+      border: 1px solid #333;
       border-radius: 8px;
+      margin-bottom: 30px;
+      box-shadow:
+        0 0 12px rgba(255, 152, 0, 0.8),
+        0 0 20px rgba(255, 152, 0, 0.6);
+    }
+    form {
+      text-align: left;
+    }
+    label {
+      display: block;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: none;
+      background: #2c2c2c;
+      color: #eee;
+      font-size: 1em;
+      resize: vertical;
+      margin-top: 6px;
+      box-sizing: border-box;
+      transition: background 0.3s ease;
+    }
+    input:focus, textarea:focus {
+      background: #3d3d3d;
+      outline: none;
+    }
+    button {
+      width: 100%;
+      margin-top: 25px;
+      padding: 14px 0;
+      background: #ff9800;
+      border: none;
+      border-radius: 6px;
+      font-size: 1.1em;
+      font-weight: 700;
+      color: #121212;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      letter-spacing: 0.8px;
+    }
+    button:hover {
+      background: #e68900;
     }
   </style>
 </head>
@@ -48,41 +81,27 @@
   <h1>Buy Your Sticker</h1>
   <img id="product-image" alt="Sticker preview" />
 
-  <form id="purchase-form">
-    <label>
-      Email:
-      <input type="email" id="email" required />
-    </label>
+  <form id="purchase-form" autocomplete="off">
+    <label for="email">Email:</label>
+    <input type="email" id="email" required />
 
-    <label>
-      Name:
-      <input type="text" id="name" required />
-    </label>
+    <label for="name">Name:</label>
+    <input type="text" id="name" required />
 
-    <label>
-      Address:
-      <textarea id="address" rows="3" required></textarea>
-    </label>
+    <label for="address">Address:</label>
+    <textarea id="address" rows="3" required></textarea>
 
-    <label>
-      City:
-      <input type="text" id="city" required />
-    </label>
+    <label for="city">City:</label>
+    <input type="text" id="city" required />
 
-    <label>
-      State:
-      <input type="text" id="state" required />
-    </label>
+    <label for="state">State:</label>
+    <input type="text" id="state" required />
 
-    <label>
-      Country:
-      <input type="text" id="country" required />
-    </label>
+    <label for="country">Country:</label>
+    <input type="text" id="country" required />
 
-    <label>
-      ZIP:
-      <input type="text" id="zip" required />
-    </label>
+    <label for="zip">ZIP:</label>
+    <input type="text" id="zip" required />
 
     <button type="submit">Buy Now</button>
   </form>
@@ -90,11 +109,12 @@
   <script>
     const stripe = Stripe('pk_test_51Rtdm5Rs1Dqo8huI8J7T5tdhVHYCy0gq2tBd03m4HcbvjrdpmOwA3hTDlSK57RL7yKO9cNdhO6sROnUxDAa6fmKy00BRvR5iRw');
 
-    // Set product image from URL query param (e.g. buy.html?img=IMAGE_URL)
     const urlParams = new URLSearchParams(window.location.search);
     const imgUrl = urlParams.get('img');
     if (imgUrl) {
       document.getElementById('product-image').src = imgUrl;
+    } else {
+      document.getElementById('product-image').alt = "No image available";
     }
 
     const form = document.getElementById('purchase-form');
