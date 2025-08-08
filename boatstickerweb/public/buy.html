@@ -9,51 +9,87 @@
   <h1>Buy Your Sticker</h1>
   <img id="product-image" alt="Sticker preview" style="max-width:300px;" />
   
-  <form id="purchase-form">
-    <label>Email: <input type="email" id="email" required /></label><br/>
-    <label>Name: <input type="text" id="name" required /></label><br/>
-    <label>Address: <textarea id="address" required></textarea></label><br/>
-    <div id="card-element"><!-- Stripe injects card input here --></div><br/>
-    <button type="submit">Buy Now</button>
-  </form>
+ <form id="purchase-form">
+  <label>Email: <input type="email" id="email" required /></label><br/>
+  <label>Name: <input type="text" id="name" required /></label><br/>
+  <label>Address: <textarea id="address" required></textarea></label><br/>
+  <label>City: <input type="text" id="city" required /></label><br/>
+  <label>State: <input type="text" id="state" required /></label><br/>
+  <label>Country: <input type="text" id="country" required /></label><br/>
+  <label>ZIP: <input type="text" id="zip" required /></label><br/>
+  <div id="card-element"></div><br/>
+  <button type="submit">Buy Now</button>
+</form>
+
 
   <script>
-    // Get img from URL params and set it
-    const params = new URLSearchParams(window.location.search);
-    const imgUrl = params.get('img');
-    if(imgUrl) document.getElementById('product-image').src = imgUrl;
+     const stripe = Stripe('YOUR_STRIPE_PUBLISHABLE_KEY');
+const elements = stripe.elements();
+const card = elements.create('card');
+card.mount('#card-element');
 
-    // Stripe payment setup (you need to get your own Stripe publishable key)
-    const stripe = Stripe('YOUR_STRIPE_PUBLISHABLE_KEY');
-    const elements = stripe.elements();
-    const card = elements.create('card');
-    card.mount('#card-element');
+const form = document.getElementById('purchase-form');
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
 
-    const form = document.getElementById('purchase-form');
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
+  const email = document.getElementById('email').value;
+  const name = document.getElementById('name').value;
+  const address = {
+    line1: document.getElementById('address').value,
+    city: document.getElementById('city').value,
+    state: document.getElementById('state').value,
+    country: document.getElementById('country').value,
+    zip: document.getElementById('zip').value,
+  };
 
-      const email = document.getElementById('email').value;
-      const name = document.getElementById('name').value;
-      const address = document.getElementById('address').value;
+  // 1. Create payment method
+  const { paymentMethod, error } = await stripe.createPaymentMethod({
+    type: 'card',
+    card: card,
+    billing_details: { email, name, address },
+  });
 
-      // Create payment method & handle payment (you will need backend to create PaymentIntent)
-      // This is a simplified flow, Stripe docs have full example:
-      const {paymentMethod, error} = await stripe.createPaymentMethod({
-        type: 'card',
-        card: card,
-        billing_details: { email, name, address: { line1: address } },
-      });
+  if (error) {
+    alert(error.message);
+    return;
+  }
 
-      if(error) {
-        alert(error.message);
-        return;
-      }
+  // 2. Send order + paymentMethod.id to backend
+  const response = await fetch('/create-order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      name,
+      address,
+      imageUrl: document.getElementById('product-image').src,
+      paymentMethodId: paymentMethod.id,
+    }),
+  });
 
-      // Send paymentMethod.id, email, shipping info, imgUrl to your backend for processing order & payment
+  const result = await response.json();
 
-      alert('Payment method created. Now handle order server-side.');
-    });
+  if (result.error) {
+    alert('Error: ' + result.error);
+    return;
+  }
+
+  if (result.requiresAction) {
+    // Handle 3D Secure auth
+    const { error: confirmError } = await stripe.confirmCardPayment(result.paymentIntentClientSecret);
+    if (confirmError) {
+      alert('Payment failed: ' + confirmError.message);
+      return;
+    }
+    alert('Payment succeeded!');
+  } else {
+    alert('Payment succeeded! Order placed.');
+  }
+
+  // Optionally redirect or show order confirmation UI here
+});
+
   </script>
 </body>
 </html>
+
