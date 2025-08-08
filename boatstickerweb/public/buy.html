@@ -4,132 +4,76 @@
   <meta charset="UTF-8" />
   <title>Buy Your Sticker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://js.stripe.com/v3/"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
       max-width: 400px;
       margin: 30px auto;
       padding: 0 15px;
-    }
-    label {
-      display: block;
-      margin-bottom: 10px;
-    }
-    input, textarea {
-      width: 100%;
-      padding: 8px;
-      box-sizing: border-box;
-      margin-top: 4px;
-    }
-    button {
-      margin-top: 15px;
-      padding: 12px;
-      font-size: 16px;
-      width: 100%;
-      background-color: #6772e5;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
+      text-align: center;
     }
     img {
-      display: block;
-      margin: 20px auto;
       max-width: 300px;
       max-height: 300px;
       object-fit: contain;
       border: 1px solid #ccc;
       border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    button {
+      padding: 15px 30px;
+      font-size: 18px;
+      background-color: #6772e5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+      max-width: 300px;
     }
   </style>
 </head>
 <body>
-  <h1>Buy Your Sticker</h1>
+  <h1>Your Sticker Preview</h1>
   <img id="product-image" alt="Sticker preview" />
 
-  <form id="purchase-form">
-    <label>
-      Email:
-      <input type="email" id="email" required />
-    </label>
-
-    <label>
-      Name:
-      <input type="text" id="name" required />
-    </label>
-
-    <label>
-      Address:
-      <textarea id="address" rows="3" required></textarea>
-    </label>
-
-    <label>
-      City:
-      <input type="text" id="city" required />
-    </label>
-
-    <label>
-      State:
-      <input type="text" id="state" required />
-    </label>
-
-    <label>
-      Country:
-      <input type="text" id="country" required />
-    </label>
-
-    <label>
-      ZIP:
-      <input type="text" id="zip" required />
-    </label>
-
-    <button type="submit">Buy Now</button>
-  </form>
+  <button id="buy-button">Buy Now</button>
 
   <script>
-    const stripe = Stripe('pk_test_51Rtdm5Rs1Dqo8huI8J7T5tdhVHYCy0gq2tBd03m4HcbvjrdpmOwA3hTDlSK57RL7yKO9cNdhO6sROnUxDAa6fmKy00BRvR5iRw');
-
-    // Set product image from URL query param (e.g. buy.html?img=IMAGE_URL)
+    // Get image URL from query string (e.g. buy.html?img=URL)
     const urlParams = new URLSearchParams(window.location.search);
     const imgUrl = urlParams.get('img');
+    const productImage = document.getElementById('product-image');
+
     if (imgUrl) {
-      document.getElementById('product-image').src = imgUrl;
+      productImage.src = imgUrl;
+    } else {
+      productImage.alt = "No sticker preview available";
     }
 
-    const form = document.getElementById('purchase-form');
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
+    // Buy button redirects to Stripe Checkout session
+    document.getElementById('buy-button').addEventListener('click', async () => {
+      if (!imgUrl) {
+        alert('No product image URL specified.');
+        return;
+      }
 
-      const email = document.getElementById('email').value.trim();
-      const name = document.getElementById('name').value.trim();
-      const address = {
-        line1: document.getElementById('address').value.trim(),
-        city: document.getElementById('city').value.trim(),
-        state: document.getElementById('state').value.trim(),
-        country: document.getElementById('country').value.trim(),
-        zip: document.getElementById('zip').value.trim(),
-      };
-
-      // Call backend to create Stripe Checkout session
       try {
         const response = await fetch('/create-checkout-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, name, address, imageUrl: imgUrl || '' }),
+          body: JSON.stringify({ imageUrl: imgUrl }),
         });
 
         const data = await response.json();
 
-        if (data.error) {
-          alert('Error: ' + data.error);
-          return;
+        if (data.url) {
+          window.location.href = data.url; // Redirect to Stripe Checkout
+        } else {
+          alert('Failed to create checkout session.');
         }
-
-        // Redirect to Stripe Checkout hosted page
-        window.location.href = data.url;
-      } catch (err) {
-        alert('Failed to create checkout session: ' + err.message);
+      } catch (error) {
+        alert('Error creating checkout session: ' + error.message);
       }
     });
   </script>
