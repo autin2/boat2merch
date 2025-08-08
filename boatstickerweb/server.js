@@ -171,7 +171,7 @@ app.post("/create-checkout-session", async (req, res) => {
               name: "Boat Sticker",
               images: [imageUrl],
             },
-            unit_amount: 100, // $1.00 in cents, update as needed
+            unit_amount: 700, // $1.00 in cents, update as needed
           },
           quantity: 1,
         },
@@ -272,5 +272,6 @@ app.post(
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
 
 
