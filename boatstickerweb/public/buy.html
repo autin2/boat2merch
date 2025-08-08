@@ -111,7 +111,6 @@
         zip: document.getElementById('zip').value.trim(),
       };
 
-      // Call backend to create Stripe Checkout session
       try {
         const response = await fetch('/create-checkout-session', {
           method: 'POST',
@@ -126,7 +125,6 @@
           return;
         }
 
-        // Redirect to Stripe Checkout hosted page
         window.location.href = data.url;
       } catch (err) {
         alert('Failed to create checkout session: ' + err.message);
