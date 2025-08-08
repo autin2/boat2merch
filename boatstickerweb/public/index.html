@@ -5,9 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Turn your boat into a custom sticker, shirt, or any print-on-demand item using AI." />
   <meta name="keywords" content="boat sticker, boat shirt, custom boat print, AI boat art, personalized boat merchandise" />
-  <meta name="author" content="Your Brand Name" />
+  <meta name="author" content="Boat2Merch" />
   <title>Boat2Merch - Turn Your Boat into Stickers & Shirts</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .settings-box {
+      margin-top: 15px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #1e1e1e;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.95em;
+    }
+    .settings-box input[type="checkbox"] {
+      transform: scale(1.2);
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
 
@@ -15,7 +31,7 @@
   <header>
     <div class="logo">🚤 Boat2Merch</div>
     <nav>
-      <a href="index.html">Home</a>
+      <a href="index.html" class="active">Home</a>
       <a href="how-it-works.html">How It Works</a>
       <a href="pricing.html">Pricing</a>
       <a href="examples.html">Examples</a>
@@ -31,22 +47,27 @@
     <!-- Hidden file input -->
     <input type="file" id="boatUpload" accept="image/*" style="display: none;" />
 
-    <!-- Upload and Edit buttons -->
+    <!-- Upload + Settings -->
     <div style="margin-top: 20px;">
       <button class="btn-primary" id="uploadBtn">Upload Your Boat</button>
       <button class="btn-secondary" id="editBtn" style="display:none; margin-left: 10px;">Buy as a sticker</button>
-
+      
+      <!-- Settings Area -->
+      <div class="settings-box">
+        <input type="checkbox" id="stickerOption" />
+        <label for="stickerOption">Sticker</label>
+      </div>
     </div>
+
+    <!-- Where results will appear -->
+    <div id="resultContainer" style="margin-top:20px;"></div>
   </section>
 
   <script>
     const uploadBtn = document.getElementById("uploadBtn");
     const boatUpload = document.getElementById("boatUpload");
     const editBtn = document.getElementById("editBtn");
-
-    const resultContainer = document.createElement("div");
-    resultContainer.style.marginTop = "20px";
-    document.querySelector(".hero").appendChild(resultContainer);
+    const resultContainer = document.getElementById("resultContainer");
 
     uploadBtn.addEventListener("click", () => boatUpload.click());
 
@@ -65,8 +86,11 @@
       const formData = new FormData();
       formData.append("boatImage", file);
 
+      // Include the sticker checkbox value if needed for future
+      const stickerChecked = document.getElementById("stickerOption").checked;
+      formData.append("sticker", stickerChecked);
+
       try {
-        // Start prediction
         const uploadResp = await fetch("/generate-image", {
           method: "POST",
           body: formData,
@@ -78,8 +102,7 @@
         const predictionId = prediction?.id;
         if (!predictionId) throw new Error("No prediction ID returned");
 
-        // Poll function
-        const pollInterval = 2000; // ms
+        const pollInterval = 2000;
         const maxAttempts = 30;
         let attempts = 0;
 
@@ -97,12 +120,10 @@
               <a href="${imageUrl}" download="boat-ai-design.png" class="btn-download">Download Image</a>
             `;
 
-            // Show and configure Edit button
             editBtn.style.display = "inline-block";
             editBtn.onclick = () => {
               window.location.href = "buy.html?img=" + encodeURIComponent(imageUrl);
             };
-
           } else if (statusData.status === "failed") {
             resultContainer.innerHTML = `<p>AI generation failed. Please try again.</p>`;
           } else {
@@ -152,5 +173,3 @@
 
 </body>
 </html>
-
-
