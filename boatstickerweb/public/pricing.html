@@ -2,75 +2,108 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="See pricing plans for turning your boat into custom stickers, shirts, and other merchandise." />
   <meta name="keywords" content="boat stickers price, custom boat shirt cost, AI boat art pricing" />
-  <meta name="author" content="Your Brand Name" />
+  <meta name="author" content="Boat2Merch" />
   <title>Pricing - Boat2Merch</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
   <!-- Header -->
-  <header>
-    <div class="logo">🚤 Boat2Merch</div>
-    <nav>
-      <a href="index.html">Home</a>
-      <a href="how-it-works.html">How It Works</a>
-      <a href="pricing.html" class="active">Pricing</a>
-      <a href="examples.html">Examples</a>
-      <a href="contact.html">Contact</a>
-    </nav>
+  <header class="site-header">
+    <div class="container nav-row">
+      <div class="brand">
+        <span class="logo-emoji">🚤</span> Boat2Merch
+      </div>
+      <nav class="topnav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="how-it-works.html">How It Works</a>
+        <a href="pricing.html" class="active">Pricing</a>
+        <a href="examples.html">Examples</a>
+        <a href="contact.html">Contact</a>
+      </nav>
+    </div>
   </header>
 
   <!-- Page Header -->
   <section class="page-header">
-    <h1>Pricing</h1>
-    <p>Choose the plan that fits your needs. No hidden fees.</p>
+    <div class="container">
+      <h1>Pricing</h1>
+      <p class="muted">Choose the plan that fits your needs. No hidden fees.</p>
+    </div>
   </section>
 
-  <!-- Pricing Plans -->
- <section class="pricing">
-  <div class="plan">
-    <h2>Free</h2>
-    <p class="price">$0<span class="per">/month</span></p>
-    <ul>
-      <li>1 AI-generated boat design</li>
-      <li>Low-resolution preview</li>
-      <li>No print rights</li>
-    </ul>
-    <button class="btn-secondary">Get Started</button>
-  </div>
+  <!-- Plans -->
+  <section class="pricing">
+    <div class="container" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:18px;">
+      <!-- Free -->
+      <div class="plan card pad" aria-label="Free plan">
+        <h2>Free</h2>
+        <p class="price">$0<span class="per">/month</span></p>
+        <ul>
+          <li>1 AI-generated boat design</li>
+          <li>Low-resolution preview</li>
+          <li>No print rights</li>
+        </ul>
+        <button class="btn-secondary" onclick="location.href='index.html'">Get Started</button>
+      </div>
 
-  <div class="plan featured">
-    <h2>Pro</h2>
-    <p class="price">$19<span class="per">/month</span></p>
-    <ul>
-      <li>5 AI-generated boat designs</li>
-      <li>High-resolution files</li>
-      <li>Full print rights</li>
-      <li>Priority support</li>
-    </ul>
-    <button class="btn-primary">Upgrade Now</button>
-  </div>
+      <!-- Pro -->
+      <div class="plan featured card pad" aria-label="Pro plan">
+        <h2>Pro</h2>
+        <p class="price">$19<span class="per">/month</span></p>
+        <ul>
+          <li>5 AI-generated boat designs</li>
+          <li>High-resolution files</li>
+          <li>Full print rights</li>
+          <li>Priority support</li>
+        </ul>
+        <button class="btn-primary" onclick="location.href='index.html'">Upgrade Now</button>
+      </div>
 
-  <div class="plan">
-    <h2>Unlimited</h2>
-    <p class="price">$49<span class="per">/month</span></p>
-    <ul>
-      <li>Unlimited designs</li>
-      <li>High-resolution files</li>
-      <li>Full print rights</li>
-      <li>Priority support</li>
-    </ul>
-    <button class="btn-secondary">Go Unlimited</button>
-  </div>
-</section>
+      <!-- Unlimited -->
+      <div class="plan card pad" aria-label="Unlimited plan">
+        <h2>Unlimited</h2>
+        <p class="price">$49<span class="per">/month</span></p>
+        <ul>
+          <li>Unlimited designs</li>
+          <li>High-resolution files</li>
+          <li>Full print rights</li>
+          <li>Priority support</li>
+        </ul>
+        <button class="btn-secondary" onclick="location.href='index.html'">Go Unlimited</button>
+      </div>
+    </div>
+  </section>
 
+  <!-- Notes -->
+  <section>
+    <div class="container">
+      <div class="card pad">
+        <h3 style="margin:0 0 8px;">What’s included</h3>
+        <p class="muted" style="margin:0;">
+          All plans include background removal and clean line-art. Sticker mode adds a bold white contour on a transparent background—perfect for die-cut printing.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <div class="container">
+      <h2 style="margin:0 0 10px;">Ready to try it?</h2>
+      <p class="muted" style="margin:0 0 18px;">Upload a photo and generate your first design in minutes.</p>
+      <a href="index.html"><button class="btn-primary">Upload Your Boat</button></a>
+    </div>
+  </section>
 
   <!-- Footer -->
   <footer>
-    <p>&copy; 2025 Boat2Merch | All rights reserved.</p>
+    <div class="container">
+      <p>&copy; 2025 Boat2Merch · All rights reserved.</p>
+    </div>
   </footer>
 
 </body>
