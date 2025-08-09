@@ -24,49 +24,55 @@ const {
   SMTP_USER,
   SMTP_PASS,
 
-  // Gooten (recipe + billing are still envs)
+  // Gooten (recipe + billing are envs)
   GOOTEN_RECIPE_ID,
   GOOTEN_PARTNER_BILLING_KEY,
   GOOTEN_TEST_MODE,
 
-  // Optional override: if set, we use this SKU directly (must be US-enabled)
+  // Optional override (validated; if invalid for country, we ignore it)
   GOOTEN_STICKER_SKU,
 } = process.env;
 
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
-// ---------- Static sticker config (no envs needed) ----------
+// ---------- Static sticker config ----------
 /**
- * You MUST set the correct Die-Cut Stickers product id from Gooten here.
- * Grab it from their "productvariants" call in your browser Network tab.
- * Example placeholder shown; replace with the real one from your account/catalog.
+ * REQUIRED: Set to Die-Cut Stickers product id from Gooten (string/number).
+ * Grab it from the "productvariants" call in your browser Network tab.
  */
-const GOOTEN_PRODUCT_ID = "PUT_PRODUCT_ID_HERE"; // e.g. "1089" (string or number works)
-const DESIRED_SIZE = "525x725"; // e.g. "4x4", "5x5", "525x725"
-const DESIRED_PACK = "1Pack";   // e.g. "1Pack", "10Pack"
-const DESIRED_VARIANT = "Single"; // e.g. "Single", "Gloss", etc. (depends on catalog naming)
+const GOOTEN_PRODUCT_ID = "PUT_PRODUCT_ID_HERE"; // e.g. "1089"
+
+const DESIRED_SIZE = "525x725";     // e.g. "4x4", "5x5", "525x725"
+const DESIRED_PACK = "1Pack";       // e.g. "1Pack", "10Pack"
+const DESIRED_VARIANT = "Single";   // depends on catalog naming
 
 // ---------- Helpers ----------
 const MAX_SOURCEID_LEN = 50;
 const safeSourceId = (id) => (id ? String(id).slice(0, MAX_SOURCEID_LEN) : undefined);
 
-async function getUsEnabledStickerSku() {
-  if (!GOOTEN_PRODUCT_ID) {
-    throw new Error("GOOTEN_PRODUCT_ID is missing. Set the product id for Die-Cut Stickers at the top of server.js.");
-  }
+function getShipCountryCode(addr) {
+  const c =
+    addr?.country ||
+    addr?.CountryCode ||
+    (typeof addr?.Country === "string" ? addr.Country : null) ||
+    "US";
+  return String(c).toUpperCase();
+}
 
+async function fetchVariantsForCountry(countryCode) {
+  if (!GOOTEN_PRODUCT_ID) {
+    throw new Error("GOOTEN_PRODUCT_ID missing. Set the Die-Cut Stickers product id at the top of server.js.");
+  }
   const url = `https://api.print.io/api/v/5/source/api/productvariants/?productid=${encodeURIComponent(
     GOOTEN_PRODUCT_ID
-  )}&countrycode=US`;
+  )}&countrycode=${encodeURIComponent(countryCode)}`;
 
   const resp = await fetch(url);
   if (!resp.ok) {
     throw new Error(`Gooten productvariants failed: ${resp.status} ${await resp.text()}`);
   }
-
   const data = await resp.json();
 
-  // Try to normalize possible response shapes:
   const list =
     data?.ProductVariants ||
     data?.Variants ||
@@ -75,33 +81,61 @@ async function getUsEnabledStickerSku() {
     (Array.isArray(data) ? data : []) ||
     [];
 
-  // Filter for variants that are enabled/available in US
-  const variants = list.filter((v) => {
+  // Enabled for the given country
+  const enabled = list.filter((v) => {
     const enabledCountries = v?.IsEnabledIn || v?.EnabledIn || v?.AvailableIn || [];
-    const isEnabledFlag = v?.IsEnabled === true || v?.IsEnabledInUS === true;
-    return isEnabledFlag || (Array.isArray(enabledCountries) && enabledCountries.includes("US"));
+    const flag = v?.IsEnabled === true || v?.IsEnabledInUS === true || v?.IsEnabledInCA === true;
+    return flag || (Array.isArray(enabledCountries) && enabledCountries.includes(countryCode));
   });
 
-  if (!variants.length) {
-    throw new Error("No US-enabled variants returned by Gooten for this product.");
+  return enabled.map((v) => ({
+    sku: v?.Sku || v?.SKU || "",
+    name: v?.Name || v?.VariantName || "",
+  })).filter(v => v.sku);
+}
+
+function pickPreferredVariant(enabled, { size, pack, variant }) {
+  // Try strict match first
+  const strict = enabled.find((v) => {
+    const hay = `${v.sku} ${v.name}`;
+    return hay.includes(size) && hay.includes(pack) && hay.includes(variant);
+  });
+  if (strict) return strict.sku;
+
+  // Try partial matches by size+pack
+  const bySizePack = enabled.find((v) => {
+    const hay = `${v.sku} ${v.name}`;
+    return hay.includes(size) && hay.includes(pack);
+  });
+  if (bySizePack) return bySizePack.sku;
+
+  // Fallback: first enabled
+  return enabled[0]?.sku;
+}
+
+async function pickSkuForCountry({ preferredSku, countryCode }) {
+  const enabled = await fetchVariantsForCountry(countryCode);
+  if (!enabled.length) {
+    throw new Error(`No enabled variants for ${countryCode}.`);
   }
 
-  // Prefer a SKU that matches our desired size/pack/variant tokens in its name/SKU
-  const pick = variants.find((v) => {
-    const sku = v?.Sku || v?.SKU || "";
-    const name = v?.Name || v?.VariantName || "";
-    const hay = `${sku} ${name}`;
-    return (
-      hay.includes(DESIRED_SIZE) &&
-      hay.includes(DESIRED_PACK) &&
-      hay.includes(DESIRED_VARIANT)
-    );
+  // If we have an env override, but it's not enabled for this country, ignore it.
+  if (preferredSku) {
+    const ok = enabled.some((v) => v.sku === preferredSku);
+    if (ok) return preferredSku;
+    console.warn(`[Gooten] Env SKU "${preferredSku}" not enabled for ${countryCode}. Falling back.`);
+  }
+
+  const chosen = pickPreferredVariant(enabled, {
+    size: DESIRED_SIZE,
+    pack: DESIRED_PACK,
+    variant: DESIRED_VARIANT,
   });
 
-  const chosen = pick || variants[0];
-  const sku = chosen?.Sku || chosen?.SKU;
-  if (!sku) throw new Error("Could not determine a SKU from variants.");
-  return sku;
+  if (!chosen) {
+    throw new Error(`Could not pick a SKU for ${countryCode}.`);
+  }
+  return chosen;
 }
 
 // ---------- Nodemailer ----------
@@ -174,7 +208,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
           moderation: "auto",
           aspect_ratio: "1:1",
           number_of_images: 1,
-          output_format: "png", // PNG = best for stickers
+          output_format: "png",
           output_compression: 90,
         },
       }),
@@ -212,6 +246,17 @@ app.get("/prediction-status/:id", async (req, res) => {
   }
 });
 
+// ---------- Debug: see what SKUs are enabled ----------
+app.get("/debug/gooten-variants", async (req, res) => {
+  try {
+    const country = String(req.query.country || "US").toUpperCase();
+    const enabled = await fetchVariantsForCountry(country);
+    res.json({ country, enabledCount: enabled.length, enabled });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
 // ---------- Gooten order helper ----------
 async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
   if (!GOOTEN_RECIPE_ID || !GOOTEN_PARTNER_BILLING_KEY) {
@@ -231,11 +276,15 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     Email: email || "unknown@example.com",
   };
 
-  const safeId = safeSourceId(sourceId);
+  const countryCode = getShipCountryCode(shipTo);
 
-  // If GOOTEN_STICKER_SKU is provided, use it; else auto-pick a valid US SKU
-  const sku =
-    (GOOTEN_STICKER_SKU && GOOTEN_STICKER_SKU.trim()) || (await getUsEnabledStickerSku());
+  // Validate env override for the ship country; else pick automatically.
+  const sku = await pickSkuForCountry({
+    preferredSku: (GOOTEN_STICKER_SKU || "").trim() || null,
+    countryCode,
+  });
+
+  const safeId = safeSourceId(sourceId);
 
   const body = {
     ShipToAddress: shipTo,
@@ -243,16 +292,16 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     Items: [
       {
         Quantity: 1,
-        SKU: sku,                   // US-enabled catalog SKU
+        SKU: sku,                    // validated US/CA-enabled catalog SKU
         ShipType: "standard",
-        Images: [{ Url: imageUrl }], // per-order unique art
-        SourceId: safeId,            // <= 50 chars
+        Images: [{ Url: imageUrl }], // dynamic art
+        SourceId: safeId,
       },
     ],
     Payment: { PartnerBillingKey: GOOTEN_PARTNER_BILLING_KEY },
     IsInTestMode: String(GOOTEN_TEST_MODE).toLowerCase() === "true",
-    SourceId: safeId,                 // <= 50 chars
-    IsPartnerSourceIdUnique: true,    // prevent dupes if Stripe retries
+    SourceId: safeId,
+    IsPartnerSourceIdUnique: true,
   };
 
   const url = `https://api.print.io/api/v/5/source/api/orders/?recipeid=${encodeURIComponent(
@@ -269,7 +318,7 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     throw new Error(`Gooten order failed: ${resp.status} ${errTxt}`);
   }
 
-  return resp.json(); // returns order object with Id, etc.
+  return resp.json();
 }
 
 // ---------- Stripe: Checkout Session ----------
@@ -290,7 +339,7 @@ app.post("/create-checkout-session", async (req, res) => {
               name: "Boat Sticker",
               images: [imageUrl],
             },
-            unit_amount: 700, // $7.00 (adjust as needed)
+            unit_amount: 700, // $7.00
           },
           quantity: 1,
         },
@@ -358,7 +407,6 @@ app.post(
           }
         })();
 
-      // Submit to Gooten
       try {
         const order = await submitGootenOrder({
           imageUrl,
@@ -373,7 +421,7 @@ app.post(
             postal_code: shipping.postal_code || shipping.zip,
             phone: session.customer_details?.phone,
           },
-          // Stripe session IDs can exceed 50 chars; trimmed inside submitGootenOrder.
+          // Trimmed inside submitGootenOrder.
           sourceId: session.id,
         });
         console.log("✅ Gooten order created:", order);
