@@ -9,7 +9,6 @@
   <title>Boat2Merch — Turn Your Boat into Stickers & Shirts</title>
   <link rel="stylesheet" href="style.css" />
 
-  <!-- Page-specific polish (safe to move into style.css later) -->
   <style>
     /* Layout shell */
     .container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
@@ -33,13 +32,25 @@
     .card.pad { padding:20px; }
     .muted { color:#bcbcbc; }
 
-    /* Controls row */
-    .controls { display:flex; align-items:center; flex-wrap: wrap; gap:12px; }
+    /* Smaller generate box */
+    .card.generate-box {
+      background: #1b1b1b;
+      border: 1px solid #2c2c2c;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.25);
+      padding: 14px 16px;
+      display: inline-block;
+      text-align: center;
+      margin-top: 10px;
+    }
 
-    /* Result panel (hidden until ready) */
+    /* Controls row */
+    .controls { display:flex; align-items:center; flex-wrap: wrap; gap:12px; justify-content: center; }
+
+    /* Result panel */
     #resultPanel { display:none; margin-top:16px; }
     .result-img { max-width:100%; border-radius:10px; display:block; margin:14px auto; }
-    .btn-row { display:flex; gap:10px; flex-wrap:wrap; }
+    .btn-row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
 
     /* Buttons */
     .btn { border:none; cursor:pointer; border-radius:8px; padding:12px 18px; font-weight:600; }
@@ -92,11 +103,9 @@
         <h1 class="headline">Turn your boat photo into a clean, die-cut sticker — instantly.</h1>
         <p class="subhead">Upload a photo. Our AI returns a crisp line-art with an optional white contour, ready for stickers, shirts, and more.</p>
 
-        <!-- Action card -->
-        <div class="card pad" role="region" aria-label="Upload and settings">
-          <!-- Hidden system file input -->
+        <!-- Action box (smaller) -->
+        <div class="card generate-box" role="region" aria-label="Upload and settings">
           <input type="file" id="boatUpload" accept="image/*" style="display:none" />
-
           <div class="controls">
             <button class="btn btn-primary" id="btnImage">Generate an Image</button>
             <button class="btn btn-secondary" id="btnSticker">Generate a Sticker</button>
@@ -182,15 +191,12 @@
 
     let currentMode = "image"; // "image" | "sticker"
 
-    // Button handlers set mode and open file dialog
     btnImage.addEventListener("click", () => { currentMode = "image"; boatUpload.click(); });
     btnSticker.addEventListener("click", () => { currentMode = "sticker"; boatUpload.click(); });
 
-    // Handle upload + polling
     boatUpload.addEventListener("change", async () => {
       if (boatUpload.files.length === 0) return;
 
-      // Reset UI
       resultPanel.style.display = "none";
       editBtn.style.display = "none";
       statusArea.innerHTML = `
@@ -203,7 +209,7 @@
       const file = boatUpload.files[0];
       const formData = new FormData();
       formData.append("boatImage", file);
-      formData.append("mode", currentMode); // BACKEND will switch prompts based on this
+      formData.append("mode", currentMode);
 
       try {
         const uploadResp = await fetch("/generate-image", { method: "POST", body: formData });
@@ -213,7 +219,7 @@
         const predictionId = prediction?.id;
         if (!predictionId) throw new Error("No prediction ID returned");
 
-        const pollInterval = 2000; // ms
+        const pollInterval = 2000;
         const maxAttempts = 30;
         let attempts = 0;
 
@@ -224,14 +230,11 @@
 
           if (statusData.status === "succeeded" && statusData.output?.length) {
             const imageUrl = statusData.output[0];
-
-            // Update UI
             statusArea.innerHTML = "";
             resultImage.src = imageUrl;
             downloadBtn.href = imageUrl;
             resultPanel.style.display = "block";
 
-            // Buttons: both go to buy
             editBtn.style.display = "inline-block";
             const goBuy = () => window.location.href = "buy.html?img=" + encodeURIComponent(imageUrl);
             editBtn.onclick = goBuy;
@@ -247,13 +250,11 @@
             }
           }
         }
-
         poll();
       } catch (err) {
         console.error(err);
         statusArea.innerHTML = `<div class="card pad" style="border-color:#733;">Error: ${err.message}</div>`;
       } finally {
-        // clear the input so selecting the same file again re-triggers change
         boatUpload.value = "";
       }
     });
