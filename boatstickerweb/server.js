@@ -33,6 +33,11 @@ const {
 
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
+// ---------- Helpers ----------
+const MAX_SOURCEID_LEN = 50;
+const safeSourceId = (id) =>
+  id ? String(id).slice(0, MAX_SOURCEID_LEN) : undefined;
+
 // ---------- Nodemailer ----------
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
@@ -163,6 +168,8 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     Email: email || "unknown@example.com",
   };
 
+  const safeId = safeSourceId(sourceId);
+
   const body = {
     ShipToAddress: shipTo,
     BillingAddress: shipTo,
@@ -171,14 +178,14 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
         Quantity: 1,
         SKU: GOOTEN_STICKER_SKU,      // your 4x4 die-cut SKU
         ShipType: "standard",
-        Images: [{ Url: imageUrl }],  // <-- per-order unique art
-        SourceId: sourceId || undefined,
+        Images: [{ Url: imageUrl }],  // per-order unique art
+        SourceId: safeId,             // <= 50 chars
       },
     ],
     Payment: { PartnerBillingKey: GOOTEN_PARTNER_BILLING_KEY },
     IsInTestMode: String(GOOTEN_TEST_MODE).toLowerCase() === "true",
-    SourceId: sourceId || undefined,
-    IsPartnerSourceIdUnique: true, // prevent dupes if Stripe retries
+    SourceId: safeId,                // <= 50 chars
+    IsPartnerSourceIdUnique: true,   // prevent dupes if Stripe retries
   };
 
   const url = `https://api.print.io/api/v/5/source/api/orders/?recipeid=${encodeURIComponent(GOOTEN_RECIPE_ID)}`;
@@ -294,7 +301,8 @@ app.post(
             postal_code: shipping.postal_code || shipping.zip,
             phone: session.customer_details?.phone,
           },
-          sourceId: session.id, // useful de-dupe key
+          // Stripe session IDs can exceed 50 chars; trim for Gooten.
+          sourceId: session.id,
         });
         console.log("✅ Gooten order created:", order);
       } catch (e) {
