@@ -10,21 +10,30 @@ const app = express();
 const upload = multer({ dest: "uploads/" });
 
 const {
+  // Image gen
   REPLICATE_API_TOKEN,
   OPENAI_API_KEY,
+
+  // Stripe
   STRIPE_SECRET_KEY,
-  PRINTFUL_API_KEY,
+  STRIPE_WEBHOOK_SECRET,
+
+  // Email
   SMTP_HOST,
   SMTP_PORT,
   SMTP_USER,
   SMTP_PASS,
-  EMAIL_TO,
-  STRIPE_WEBHOOK_SECRET,
+
+  // Gooten
+  GOOTEN_RECIPE_ID,
+  GOOTEN_PARTNER_BILLING_KEY,
+  GOOTEN_TEST_MODE,
+  GOOTEN_STICKER_SKU,
 } = process.env;
 
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
-// ---------- Nodemailer (order notification) ----------
+// ---------- Nodemailer ----------
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: parseInt(SMTP_PORT, 10),
@@ -36,7 +45,7 @@ const transporter = nodemailer.createTransport({
 app.use(express.static("public"));
 app.use((req, res, next) => {
   if (req.originalUrl === "/webhook") {
-    next(); // webhook uses raw body
+    next(); // Stripe webhook uses raw body parsing below
   } else {
     express.json()(req, res, next);
   }
@@ -48,9 +57,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   const uploadedPath = req.file.path;
 
   try {
-    console.log("📂 Received file:", req.file);
-
-    // "image" | "sticker"
+    // mode: "image" (line art only) | "sticker" (line art + white contour)
     const mode = (req.body?.mode || "sticker").toLowerCase();
     const isImageOnly = mode === "image";
 
@@ -58,18 +65,16 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       ? "Create a clean black and white line drawing of the boat shown in the input image only. Transparent background, no extra elements or shadows."
       : "Create a clean black and white line drawing of the boat shown in the input image only, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background, no extra elements or shadows.";
 
-    // Upload to tmpfiles to get a public URL
+    // 1) upload to tmpfiles.org to get public URL
     const form = new FormData();
     form.append("file", fs.createReadStream(uploadedPath), req.file.originalname);
 
-    console.log("⬆️ Uploading file to tmpfiles.org...");
     const uploadResp = await fetch("https://tmpfiles.org/api/v1/upload", {
       method: "POST",
       body: form,
       headers: form.getHeaders(),
     });
     const uploadData = await uploadResp.json();
-    console.log("📦 Tmpfiles response:", uploadData);
 
     if (!uploadData?.data?.url) {
       return res.status(500).json({ error: "No URL returned from tmpfiles" });
@@ -79,10 +84,8 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     if (!imageUrl.includes("/dl/")) {
       imageUrl = imageUrl.replace("tmpfiles.org/", "tmpfiles.org/dl/");
     }
-    console.log("🔗 Direct image URL for AI:", imageUrl);
 
-    // Kick off Replicate prediction (OpenAI gpt-image-1 via Replicate)
-    console.log(`🚀 Calling Replicate model: openai/gpt-image-1 (mode=${mode})`);
+    // 2) call Replicate (OpenAI gpt-image-1 via Replicate)
     const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
@@ -100,15 +103,13 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
           moderation: "auto",
           aspect_ratio: "1:1",
           number_of_images: 1,
-          output_format: "png", // PNG for stickers
+          output_format: "png", // PNG = best for stickers
           output_compression: 90,
         },
       }),
     });
 
     const replicateData = await replicateResp.json();
-    console.log("🖼 Replicate API response:", replicateData);
-
     if (!replicateData.id) {
       return res.status(500).json({
         error: "No prediction ID returned from Replicate",
@@ -140,76 +141,59 @@ app.get("/prediction-status/:id", async (req, res) => {
   }
 });
 
-// ---------- Printful helpers ----------
-async function createPrintfulOrder(orderData) {
-  // Using the classic /orders endpoint which accepts variant_id, sync_variant_id, external_variant_id + files[]
-  const response = await fetch("https://api.printful.com/orders", {
+// ---------- Gooten order helper ----------
+async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
+  if (!GOOTEN_STICKER_SKU) {
+    throw new Error("GOOTEN_STICKER_SKU is not set. Add it to your Render env vars.");
+  }
+  if (!GOOTEN_RECIPE_ID || !GOOTEN_PARTNER_BILLING_KEY) {
+    throw new Error("Gooten env vars missing (GOOTEN_RECIPE_ID / GOOTEN_PARTNER_BILLING_KEY).");
+  }
+
+  const shipTo = {
+    FirstName: name?.split(" ")?.[0] || "Customer",
+    LastName: name?.split(" ")?.slice(1).join(" ") || " ",
+    Line1: address?.line1 || "",
+    Line2: address?.line2 || "",
+    City: address?.city || "",
+    State: address?.state || "",
+    CountryCode: (address?.country || "US").toUpperCase(),
+    PostalCode: address?.postal_code || address?.zip || "",
+    Phone: address?.phone || "0000000000",
+    Email: email || "unknown@example.com",
+  };
+
+  const body = {
+    ShipToAddress: shipTo,
+    BillingAddress: shipTo,
+    Items: [
+      {
+        Quantity: 1,
+        SKU: GOOTEN_STICKER_SKU,      // your 4x4 die-cut SKU
+        ShipType: "standard",
+        Images: [{ Url: imageUrl }],  // <-- per-order unique art
+        SourceId: sourceId || undefined,
+      },
+    ],
+    Payment: { PartnerBillingKey: GOOTEN_PARTNER_BILLING_KEY },
+    IsInTestMode: String(GOOTEN_TEST_MODE).toLowerCase() === "true",
+    SourceId: sourceId || undefined,
+    IsPartnerSourceIdUnique: true, // prevent dupes if Stripe retries
+  };
+
+  const url = `https://api.print.io/api/v/5/source/api/orders/?recipeid=${encodeURIComponent(GOOTEN_RECIPE_ID)}`;
+  const resp = await fetch(url, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${PRINTFUL_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(orderData),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error("Printful API error: " + err);
+  if (!resp.ok) {
+    const errTxt = await resp.text();
+    throw new Error(`Gooten order failed: ${resp.status} ${errTxt}`);
   }
-  return response.json();
-}
 
-// Use whatever ID the user insists on first; fallback later if needed
-function buildStickerItemFromId({ anyId, imageUrl }) {
-  const isNumeric = /^\d+$/.test(anyId);
-  if (isNumeric) {
-    // try as sync variant id first
-    return {
-      sync_variant_id: Number(anyId),
-      quantity: 1,
-      files: [{ url: imageUrl }],
-    };
-  } else {
-    // try as external variant id (non-numeric hash) — if Printful rejects, we’ll fallback
-    return {
-      external_variant_id: String(anyId),
-      quantity: 1,
-      files: [{ url: imageUrl }],
-    };
-  }
-}
-
-// Catalog v2 lookup for Kiss-Cut 4×4 (fallback)
-let CACHED_KISS_CUT_4X4_CATALOG_VARIANT_ID = null;
-
-async function getKissCut4x4CatalogVariantId() {
-  if (CACHED_KISS_CUT_4X4_CATALOG_VARIANT_ID) return CACHED_KISS_CUT_4X4_CATALOG_VARIANT_ID;
-
-  // 1) Find the "Kiss-Cut Sticker" product
-  const prodResp = await fetch("https://api.printful.com/v2/catalog-products?search=kiss%20cut%20sticker", {
-    headers: { Authorization: `Bearer ${PRINTFUL_API_KEY}` },
-  });
-  if (!prodResp.ok) throw new Error("Printful catalog search failed: " + (await prodResp.text()));
-  const prodJson = await prodResp.json();
-  const product = (prodJson.data || []).find(p =>
-    /kiss/i.test(p.name || "") && /sticker/i.test(p.name || "")
-  );
-  if (!product) throw new Error("Kiss-Cut Sticker catalog product not found");
-
-  // 2) Get variants for that product & pick 4″ × 4″ (prefer White)
-  const varResp = await fetch(`https://api.printful.com/v2/catalog-products/${product.id}/catalog-variants`, {
-    headers: { Authorization: `Bearer ${PRINTFUL_API_KEY}` },
-  });
-  if (!varResp.ok) throw new Error("Printful catalog variants failed: " + (await varResp.text()));
-  const varJson = await varResp.json();
-
-  const fourByFour = (varJson.data || []).find(v =>
-    (v.size || "").replace(/[″”"]/g, '"').match(/4.*×.*4/i) && (!v.color || /white/i.test(v.color))
-  );
-  if (!fourByFour?.id) throw new Error("4×4 Kiss-Cut catalog variant not found");
-
-  CACHED_KISS_CUT_4X4_CATALOG_VARIANT_ID = fourByFour.id;
-  return CACHED_KISS_CUT_4X4_CATALOG_VARIANT_ID;
+  return resp.json(); // returns order object with Id, etc.
 }
 
 // ---------- Stripe: Checkout Session ----------
@@ -230,16 +214,14 @@ app.post("/create-checkout-session", async (req, res) => {
               name: "Boat Sticker",
               images: [imageUrl],
             },
-            unit_amount: 700, // $7.00 in cents
+            unit_amount: 700, // $7.00 (adjust as needed)
           },
           quantity: 1,
         },
       ],
       mode: "payment",
       customer_email: email,
-      shipping_address_collection: {
-        allowed_countries: ["US", "CA"],
-      },
+      shipping_address_collection: { allowed_countries: ["US", "CA"] },
       metadata: {
         imageUrl,
         buyerName: name,
@@ -256,7 +238,7 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// ---------- Placeholder ----------
+// ---------- Placeholder (unused) ----------
 app.post("/create-order", async (req, res) => {
   try {
     res.json({ message: "Order processing placeholder" });
@@ -266,7 +248,7 @@ app.post("/create-order", async (req, res) => {
   }
 });
 
-// ---------- Stripe webhook: email + auto-Printful (try your ID, then fallback) ----------
+// ---------- Stripe webhook -> Gooten order + email ----------
 app.post(
   "/webhook",
   express.raw({ type: "application/json" }),
@@ -290,86 +272,48 @@ app.post(
         session.metadata?.buyerName || session.customer_details?.name || "Customer";
 
       // Prefer Stripe shipping_details; fallback to your metadata JSON
-      let recipient;
-      if (session.shipping_details?.address) {
-        const ship = session.shipping_details;
-        recipient = {
-          name: buyerName,
-          email: buyerEmail,
-          address1: ship.address.line1 || "",
-          address2: ship.address.line2 || "",
-          city: ship.address.city || "",
-          state_code: ship.address.state || "",
-          country_code: ship.address.country || "",
-          zip: ship.address.postal_code || "",
-          phone: session.customer_details?.phone || undefined,
-        };
-      } else {
-        let addr = {};
-        try { addr = JSON.parse(session.metadata?.buyerAddress || "{}"); } catch {}
-        recipient = {
-          name: buyerName,
-          email: buyerEmail,
-          address1: addr.line1 || "",
-          address2: addr.line2 || "",
-          city: addr.city || "",
-          state_code: addr.state || "",
-          country_code: addr.country || "",
-          zip: addr.postal_code || addr.zip || "",
-          phone: addr.phone || undefined,
-        };
-      }
+      const shipping =
+        session.shipping_details?.address ||
+        (() => {
+          try { return JSON.parse(session.metadata?.buyerAddress || "{}"); }
+          catch { return {}; }
+        })();
 
-      // ---- Try order with user-provided ID first; if it fails, fallback to catalog variant id ----
-      const USER_PROVIDED_STICKER_ID = "68969a7ad6ae19"; // <— using exactly what you gave me
-
-      let orderCreated = false;
+      // Submit to Gooten
       try {
-        const firstItem = buildStickerItemFromId({ anyId: USER_PROVIDED_STICKER_ID, imageUrl });
-        const firstOrder = await createPrintfulOrder({
-          recipient,
-          items: [firstItem],
-          confirm: true,
+        const order = await submitGootenOrder({
+          imageUrl,
+          email: buyerEmail,
+          name: buyerName,
+          address: {
+            line1: shipping.line1,
+            line2: shipping.line2,
+            city: shipping.city,
+            state: shipping.state,
+            country: shipping.country,
+            postal_code: shipping.postal_code || shipping.zip,
+            phone: session.customer_details?.phone,
+          },
+          sourceId: session.id, // useful de-dupe key
         });
-        orderCreated = true;
-        console.log("✅ Printful order created (first try):", firstOrder.result?.id || firstOrder);
-      } catch (firstErr) {
-        console.warn("First try failed, attempting catalog fallback…", firstErr?.message || firstErr);
-        try {
-          const catalogVariantId = await getKissCut4x4CatalogVariantId();
-          const secondOrder = await createPrintfulOrder({
-            recipient,
-            items: [
-              {
-                variant_id: catalogVariantId, // numeric catalog ID
-                quantity: 1,
-                files: [{ url: imageUrl }],
-              },
-            ],
-            confirm: true,
-          });
-          orderCreated = true;
-          console.log("✅ Printful order created (fallback):", secondOrder.result?.id || secondOrder);
-        } catch (fallbackErr) {
-          console.error("❌ Printful order failed after fallback:", fallbackErr?.message || fallbackErr);
-        }
+        console.log("✅ Gooten order created:", order);
+      } catch (e) {
+        console.error("❌ Gooten order error:", e);
       }
 
-      // Send yourself the email either way (so you’re aware)
+      // Notify you via email
       try {
-        const buyerAddress = recipient;
         const emailHtml = `
           <h2>New Sticker Order</h2>
           <p><strong>Buyer Name:</strong> ${buyerName}</p>
           <p><strong>Buyer Email:</strong> ${buyerEmail}</p>
           <p><strong>Address:</strong><br/>
-            ${buyerAddress.address1 || ""}<br/>
-            ${buyerAddress.city || ""}, ${buyerAddress.state_code || ""} ${buyerAddress.zip || ""}<br/>
-            ${buyerAddress.country_code || ""}
+            ${shipping.line1 || ""}<br/>
+            ${shipping.city || ""}, ${shipping.state || ""} ${shipping.postal_code || ""}<br/>
+            ${shipping.country || ""}
           </p>
           <p><strong>Sticker Image:</strong></p>
           <img src="${imageUrl}" alt="Purchased Sticker" style="max-width:300px; border:1px solid #ccc; border-radius:6px;" />
-          <p>${orderCreated ? "✅ Printful order created automatically." : "⚠️ Printful order creation failed — please place manually."}</p>
         `;
         await transporter.sendMail({
           from: `"boat2merch" <${SMTP_USER}>`,
@@ -383,7 +327,7 @@ app.post(
       }
     }
 
-    // Stripe needs a 200 quickly
+    // Respond fast so Stripe stops retrying
     res.json({ received: true });
   }
 );
