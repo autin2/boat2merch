@@ -120,7 +120,6 @@ nav a.active {
   border-bottom: 2px solid #ff9800;
 }
 
-
 .pricing {
   display: flex;
   flex-wrap: wrap;
@@ -266,7 +265,6 @@ nav a.active {
   transition: box-shadow 0.3s ease-in-out;
 }
 
-
 .editor-container {
   position: relative;
   max-width: 800px;
@@ -336,14 +334,12 @@ nav a.active {
   to { transform: rotate(360deg); }
 }
 
-
 .image-wrapper {
   position: relative;
   display: inline-block;
   max-width: 400px;
   width: 90%;
   margin: 20px auto;
-
   padding: 15px;
   border-radius: 12px;
 }
@@ -372,6 +368,30 @@ nav a.active {
   user-select: none;
 }
 
+/* --- Fix generate button alignment --- */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
 
+.controls .btn {
+  min-width: 170px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 
+.controls .btn-secondary {
+  margin-top: 0 !important;
+}
 
+#editBtn {
+  visibility: hidden;
+}
+
+#editBtn.visible {
+  visibility: visible;
+}
