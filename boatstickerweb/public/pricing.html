@@ -3,11 +3,69 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="See pricing plans for turning your boat into custom stickers, shirts, and other merchandise." />
+  <meta name="description" content="Transparent pricing for turning your boat photos into merch-ready designs and die-cut stickers." />
   <meta name="keywords" content="boat stickers price, custom boat shirt cost, AI boat art pricing" />
   <meta name="author" content="Boat2Merch" />
   <title>Pricing - Boat2Merch</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    /* --- Page-scoped enhancements only --- */
+    .price-toggle {
+      display:flex; align-items:center; justify-content:center; gap:10px;
+      margin: 0 auto 18px;
+    }
+    .toggle {
+      position: relative; width: 56px; height: 28px; background:#2a2a2a; border:1px solid #3a3a3a;
+      border-radius: 999px; cursor: pointer;
+    }
+    .toggle .knob {
+      position:absolute; top:2px; left:2px; width:24px; height:24px; border-radius:50%;
+      background:#ff9800; transition:left .18s ease;
+    }
+    .toggle.on .knob { left: 30px; }
+
+    .plans-grid {
+      display:grid; grid-template-columns: repeat(3, 1fr); gap:18px;
+    }
+    @media (max-width: 900px){ .plans-grid{ grid-template-columns:1fr; } }
+
+    .plan.card.pad { position:relative; overflow:hidden; }
+    .plan .badge {
+      position:absolute; top:12px; right:-24px; transform: rotate(35deg);
+      background:#ff9800; color:#121212; font-weight:700; font-size:.8rem;
+      padding:6px 40px; box-shadow:0 8px 20px rgba(0,0,0,.25);
+      border:1px solid #ffb347;
+    }
+
+    .price {
+      font-size: 2.2em;
+      margin: 10px 0 4px;
+      color: #ff9800;
+    }
+    .price small { font-size:.55em; color:#cfcfcf; }
+    .save-pill {
+      display:inline-block; margin-left:8px; padding:2px 8px; border-radius:999px;
+      background:#2a2a2a; border:1px solid #3a3a3a; color:#ffda9e; font-size:.75rem;
+    }
+
+    .plan ul { text-align:left; margin-top:12px; }
+    .plan ul li::marker { content: "✓ "; color:#4caf50; }
+
+    .compare {
+      display:grid; grid-template-columns: 1.3fr repeat(3, 1fr);
+      gap:12px; align-items:center;
+    }
+    .compare .head { font-weight:700; }
+    .chip {
+      display:inline-block; padding:4px 10px; border-radius:999px;
+      background:#2a2a2a; border:1px solid #3a3a3a; color:#ddd; font-size:.85rem;
+    }
+    .faq-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:18px; }
+    @media (max-width: 900px){ .faq-grid{ grid-template-columns:1fr; } }
+
+    .tick { color:#4caf50; font-weight:700; }
+    .cross { color:#b75; font-weight:700; }
+  </style>
 </head>
 <body>
 
@@ -31,31 +89,47 @@
   <section class="page-header">
     <div class="container">
       <h1>Pricing</h1>
-      <p class="muted">Choose the plan that fits your needs. No hidden fees.</p>
+      <p class="muted">Simple, flexible plans. No hidden fees.</p>
+
+      <!-- Toggle -->
+      <div class="price-toggle" role="group" aria-label="Billing period">
+        <span class="muted">Monthly</span>
+        <div id="billingToggle" class="toggle" tabindex="0" role="switch" aria-checked="false" aria-label="Switch to yearly billing">
+          <div class="knob"></div>
+        </div>
+        <span class="muted">Yearly <span class="save-pill">Save ~20%</span></span>
+      </div>
     </div>
   </section>
 
   <!-- Plans -->
   <section class="pricing">
-    <div class="container" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:18px;">
+    <div class="container plans-grid">
       <!-- Free -->
       <div class="plan card pad" aria-label="Free plan">
         <h2>Free</h2>
-        <p class="price">$0<span class="per">/month</span></p>
+        <p class="price">
+          <span class="amount" data-monthly="0" data-yearly="0">$0</span>
+          <small class="per">/ <span class="period">month</span></small>
+        </p>
         <ul>
           <li>1 AI-generated boat design</li>
           <li>Low-resolution preview</li>
-          <li>No print rights</li>
+          <li class="muted">No print rights</li>
         </ul>
         <button class="btn-secondary" onclick="location.href='index.html'">Get Started</button>
       </div>
 
-      <!-- Pro -->
+      <!-- Pro (Featured) -->
       <div class="plan featured card pad" aria-label="Pro plan">
+        <div class="badge">MOST POPULAR</div>
         <h2>Pro</h2>
-        <p class="price">$19<span class="per">/month</span></p>
+        <p class="price">
+          <span class="amount" data-monthly="19" data-yearly="15">$19</span>
+          <small class="per">/ <span class="period">month</span></small>
+        </p>
         <ul>
-          <li>5 AI-generated boat designs</li>
+          <li>5 AI-generated designs / mo</li>
           <li>High-resolution files</li>
           <li>Full print rights</li>
           <li>Priority support</li>
@@ -66,7 +140,10 @@
       <!-- Unlimited -->
       <div class="plan card pad" aria-label="Unlimited plan">
         <h2>Unlimited</h2>
-        <p class="price">$49<span class="per">/month</span></p>
+        <p class="price">
+          <span class="amount" data-monthly="49" data-yearly="39">$49</span>
+          <small class="per">/ <span class="period">month</span></small>
+        </p>
         <ul>
           <li>Unlimited designs</li>
           <li>High-resolution files</li>
@@ -78,14 +155,75 @@
     </div>
   </section>
 
-  <!-- Notes -->
+  <!-- Comparison -->
   <section>
     <div class="container">
       <div class="card pad">
-        <h3 style="margin:0 0 8px;">What’s included</h3>
+        <div class="compare">
+          <div class="head">Feature</div>
+          <div class="head">Free</div>
+          <div class="head">Pro</div>
+          <div class="head">Unlimited</div>
+
+          <div>AI designs/month</div>
+          <div>1</div>
+          <div>5</div>
+          <div>∞</div>
+
+          <div>High-res files</div>
+          <div class="cross">×</div>
+          <div class="tick">✓</div>
+          <div class="tick">✓</div>
+
+          <div>Print rights</div>
+          <div class="cross">×</div>
+          <div class="tick">✓</div>
+          <div class="tick">✓</div>
+
+          <div>Priority support</div>
+          <div class="cross">×</div>
+          <div class="tick">✓</div>
+          <div class="tick">✓</div>
+
+          <div>Sticker-ready outline</div>
+          <div class="tick">✓</div>
+          <div class="tick">✓</div>
+          <div class="tick">✓</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- What’s included -->
+  <section>
+    <div class="container">
+      <div class="card pad">
+        <h3 style="margin:0 0 8px;">All plans include</h3>
         <p class="muted" style="margin:0;">
-          All plans include background removal and clean line-art. Sticker mode adds a bold white contour on a transparent background—perfect for die-cut printing.
+          Background removal, clean black-and-white line art, and optional white die-cut contour for stickers on a transparent background.
         </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section>
+    <div class="container faq-grid">
+      <div class="card pad">
+        <h3 style="margin-top:0;">Can I switch plans later?</h3>
+        <p class="muted">Yes. Upgrade or downgrade anytime; changes prorate to the next cycle.</p>
+      </div>
+      <div class="card pad">
+        <h3 style="margin-top:0;">Do I keep commercial rights?</h3>
+        <p class="muted">Free is preview-only. Pro and Unlimited include full print rights for your generated art.</p>
+      </div>
+      <div class="card pad">
+        <h3 style="margin-top:0;">What image types can I upload?</h3>
+        <p class="muted">Most common formats (JPG/PNG/WebP). Higher resolution photos produce cleaner edges.</p>
+      </div>
+      <div class="card pad">
+        <h3 style="margin-top:0;">How fast is generation?</h3>
+        <p class="muted">Usually under two minutes. You’ll see live status during processing.</p>
       </div>
     </div>
   </section>
@@ -106,5 +244,31 @@
     </div>
   </footer>
 
+  <script>
+    // Monthly ↔ Yearly toggle
+    const toggle = document.getElementById('billingToggle');
+    const amounts = document.querySelectorAll('.amount');
+    const periods = document.querySelectorAll('.period');
+
+    function setBilling(yearly) {
+      amounts.forEach(span => {
+        const m = span.getAttribute('data-monthly');
+        const y = span.getAttribute('data-yearly');
+        const val = yearly ? y : m;
+        span.textContent = (val === "0") ? "$0" : `$${val}`;
+      });
+      periods.forEach(p => p.textContent = yearly ? 'year' : 'month');
+      toggle.classList.toggle('on', yearly);
+      toggle.setAttribute('aria-checked', yearly ? 'true' : 'false');
+      toggle.setAttribute('aria-label', yearly ? 'Switch to monthly billing' : 'Switch to yearly billing');
+    }
+
+    let yearly = false;
+    setBilling(yearly);
+
+    function flip() { yearly = !yearly; setBilling(yearly); }
+    toggle.addEventListener('click', flip);
+    toggle.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
+  </script>
 </body>
 </html>
