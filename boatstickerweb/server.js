@@ -41,7 +41,7 @@ app.use(express.static("public"));
 // Use JSON parser only on non-webhook routes
 app.use((req, res, next) => {
   if (req.originalUrl === "/webhook") {
-    next(); // skip JSON parsing for webhook
+    next(); // skip JSON parsing for webhook (we use express.raw there)
   } else {
     express.json()(req, res, next); // parse JSON for other routes
   }
@@ -51,11 +51,23 @@ app.use((req, res, next) => {
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
+  const uploadedPath = req.file.path;
+
   try {
     console.log("📂 Received file:", req.file);
 
+    // Read mode from multipart text fields: "image" | "sticker"
+    const mode = (req.body?.mode || "sticker").toLowerCase();
+    const isImageOnly = mode === "image";
+
+    // Build prompt based on mode
+    const prompt = isImageOnly
+      ? "Create a clean black and white line drawing of the boat shown in the input image only. Transparent background, no extra elements or shadows."
+      : "Create a clean black and white line drawing of the boat shown in the input image only, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background, no extra elements or shadows.";
+
+    // 1) Upload to tmpfiles.org to get a public URL
     const form = new FormData();
-    form.append("file", fs.createReadStream(req.file.path), req.file.originalname);
+    form.append("file", fs.createReadStream(uploadedPath), req.file.originalname);
 
     console.log("⬆️ Uploading file to tmpfiles.org...");
     const uploadResp = await fetch("https://tmpfiles.org/api/v1/upload", {
@@ -77,7 +89,8 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     }
     console.log("🔗 Direct image URL for AI:", imageUrl);
 
-    console.log(`🚀 Calling Replicate model: openai/gpt-image-1`);
+    // 2) Kick off Replicate prediction (OpenAI gpt-image-1 via Replicate)
+    console.log(`🚀 Calling Replicate model: openai/gpt-image-1 (mode=${mode})`);
     const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
@@ -87,8 +100,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       body: JSON.stringify({
         version: "openai/gpt-image-1",
         input: {
-          prompt:
-            "Create a clean black and white line drawing of the boat shown in the input image only, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background, no extra elements or shadows.",
+          prompt,
           input_images: [imageUrl],
           openai_api_key: OPENAI_API_KEY,
           quality: "auto",
@@ -116,6 +128,11 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   } catch (error) {
     console.error("❌ Image generation error:", error);
     res.status(500).json({ error: "Failed to generate image" });
+  } finally {
+    // Clean up local temp file
+    if (uploadedPath) {
+      fs.promises.unlink(uploadedPath).catch(() => {});
+    }
   }
 });
 
@@ -171,7 +188,7 @@ app.post("/create-checkout-session", async (req, res) => {
               name: "Boat Sticker",
               images: [imageUrl],
             },
-            unit_amount: 700, // $1.00 in cents, update as needed
+            unit_amount: 700, // $7.00 in cents (update as needed)
           },
           quantity: 1,
         },
@@ -272,6 +289,3 @@ app.post(
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
-
-
-
