@@ -405,13 +405,20 @@ header.site-header { background:#1e1e1e; border-bottom:1px solid #2a2a2a; positi
 nav.topnav a { color:#cfcfcf; text-decoration:none; margin-left:18px; }
 nav.topnav a:hover, nav.topnav a.active { color:#fff; border-bottom:2px solid #ff9800; padding-bottom:4px; }
 
-/* UPDATED hero-inner to reduce wasted space */
+/* HERO LAYOUT FIXES */
 .hero-inner {
   display: grid;
   grid-template-columns: minmax(300px, auto) minmax(260px, 1fr);
   gap: 24px;
   padding: 64px 0;
   align-items: start;
+}
+
+@media (min-width: 901px) {
+  .hero-inner {
+    grid-template-columns: minmax(380px, 560px) minmax(300px, 380px);
+    justify-content: center;
+  }
 }
 
 @media (max-width: 900px){ .hero-inner{ grid-template-columns:1fr; } }
@@ -423,16 +430,19 @@ nav.topnav a:hover, nav.topnav a.active { color:#fff; border-bottom:2px solid #f
 .card.pad { padding:20px; height: auto; }
 .muted { color:#bcbcbc; }
 
+/* Button spacing fix */
 .btn { border:none; cursor:pointer; border-radius:8px; padding:12px 18px; font-weight:600; }
 .btn-ghost { background:#2a2a2a; color:#eaeaea; border:1px solid #3a3a3a; }
 
-.controls { gap: 8px; justify-content: flex-start; }
+.controls { gap: 10px; justify-content: center; }
+.controls .btn { min-width: 160px; flex: 0 1 auto; }
 .controls .btn-secondary { background:#03a9f4; color:#121212; margin-top:0; }
 .controls .btn-secondary:hover { background:#0288d1; }
 
-.hero aside.card.pad { max-width: 340px; }
+.hero [aria-label="Upload and settings"] { max-width: 560px; }
+.hero aside.card.pad { max-width: 380px; }
 
-#resultPanel { display:none; margin-top:16px; }
+#resultPanel { display:none; margin-top:16px; max-width: 560px; }
 .result-img { max-width:100%; border-radius:10px; display:block; margin:14px auto; }
 .btn-row { display:flex; gap:10px; flex-wrap:wrap; }
 
@@ -445,3 +455,8 @@ nav.topnav a:hover, nav.topnav a.active { color:#fff; border-bottom:2px solid #f
 
 #editBtn { visibility:hidden; }
 #editBtn.visible { visibility:visible; }
+
+/* How It Works page spacing fix */
+section .card.pad {
+  margin-bottom: 24px;
+}
