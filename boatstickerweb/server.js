@@ -56,7 +56,7 @@ function normalizeCountryCode(input, fallback = "US") {
     "U.S.": "US",
     "U.S.A.": "US",
     "AMERICA": "US",
-    "CANADA": "CA"
+    "CANADA": "CA",
   };
   return MAP[raw] || fallback;
 }
@@ -69,25 +69,72 @@ function getShipCountryCode(addr) {
   return normalizeCountryCode(c, "US");
 }
 
+// --- small in-memory cache to avoid repeated huge parses ---
+const variantsCache = new Map(); // key: countryCode -> [{sku,name}]
+const MAX_VARIANTS_BODY_BYTES = 5 * 1024 * 1024; // 5 MB safety cap
+const DEFAULT_PAGE_SIZE = 200;
+
+async function fetchWithSizeCap(url, capBytes = MAX_VARIANTS_BODY_BYTES) {
+  const resp = await fetch(url);
+  if (!resp.ok) {
+    // read small error text safely
+    const errTxt = await resp.text();
+    throw new Error(`Gooten productvariants failed: ${resp.status} ${errTxt}`);
+  }
+  // Stream and cap size to avoid OOM
+  const reader = resp.body.getReader ? resp.body.getReader() : null;
+  if (!reader) {
+    // fallback (older node-fetch): still do .text(), not ideal but okay
+    const txt = await resp.text();
+    if (txt.length > capBytes) {
+      throw new Error(`Gooten productvariants body exceeded ${capBytes} bytes`);
+    }
+    return txt;
+  }
+  let received = 0;
+  const chunks = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.byteLength;
+    if (received > capBytes) {
+      try { reader.cancel(); } catch {}
+      throw new Error(`Gooten productvariants body exceeded ${capBytes} bytes`);
+    }
+    chunks.push(value);
+  }
+  const merged = new Uint8Array(received);
+  let offset = 0;
+  for (const c of chunks) {
+    merged.set(c, offset);
+    offset += c.byteLength;
+  }
+  return new TextDecoder("utf-8").decode(merged);
+}
+
 async function fetchVariantsForCountry(countryCode) {
-  if (!GOOTEN_PRODUCT_ID) {
-    throw new Error("GOOTEN_PRODUCT_ID missing.");
-  }
-  if (!GOOTEN_RECIPE_ID) {
-    throw new Error("GOOTEN_RECIPE_ID missing.");
-  }
+  if (!GOOTEN_PRODUCT_ID) throw new Error("GOOTEN_PRODUCT_ID missing.");
+  if (!GOOTEN_RECIPE_ID) throw new Error("GOOTEN_RECIPE_ID missing.");
+
+  const key = countryCode.toUpperCase();
+  if (variantsCache.has(key)) return variantsCache.get(key);
 
   const url =
     `https://api.print.io/api/v/5/source/api/productvariants/` +
     `?recipeid=${encodeURIComponent(GOOTEN_RECIPE_ID)}` +
     `&productid=${encodeURIComponent(GOOTEN_PRODUCT_ID)}` +
-    `&countrycode=${encodeURIComponent(countryCode)}`;
+    `&countrycode=${encodeURIComponent(countryCode)}` +
+    `&page=1&pagesize=${DEFAULT_PAGE_SIZE}`;
 
-  const resp = await fetch(url);
-  if (!resp.ok) {
-    throw new Error(`Gooten productvariants failed: ${resp.status} ${await resp.text()}`);
+  const text = await fetchWithSizeCap(url);
+
+  // Parse JSON safely
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    throw new Error(`Failed to parse productvariants JSON (${text.length} bytes): ${e.message}`);
   }
-  const data = await resp.json();
 
   const list =
     data?.ProductVariants ||
@@ -103,15 +150,18 @@ async function fetchVariantsForCountry(countryCode) {
       v?.IsEnabled === true ||
       v?.IsEnabledInUS === true ||
       v?.IsEnabledInCA === true;
-    return flag || (Array.isArray(enabledCountries) && enabledCountries.includes(countryCode));
+    return flag || (Array.isArray(enabledCountries) && enabledCountries.includes(key));
   });
 
-  return enabled
+  const simplified = enabled
     .map((v) => ({
       sku: v?.Sku || v?.SKU || "",
       name: v?.Name || v?.VariantName || "",
     }))
     .filter((v) => v.sku);
+
+  variantsCache.set(key, simplified);
+  return simplified;
 }
 
 function pickPreferredVariant(enabled, { size, pack, variant }) {
@@ -132,19 +182,23 @@ function pickPreferredVariant(enabled, { size, pack, variant }) {
 
 async function pickSkuForCountry({ preferredSku, countryCode }) {
   const enabled = await fetchVariantsForCountry(countryCode);
-  if (!enabled.length) {
-    throw new Error(`No enabled variants for ${countryCode}.`);
-  }
+  if (!enabled.length) throw new Error(`No enabled variants for ${countryCode}.`);
+
   if (preferredSku) {
     const ok = enabled.some((v) => v.sku === preferredSku);
     if (ok) return preferredSku;
     console.warn(`[Gooten] Env SKU "${preferredSku}" not enabled for ${countryCode}. Falling back.`);
   }
-  return pickPreferredVariant(enabled, {
+
+  const chosen = pickPreferredVariant(enabled, {
     size: DESIRED_SIZE,
     pack: DESIRED_PACK,
     variant: DESIRED_VARIANT,
   });
+
+  if (!chosen) throw new Error(`Could not pick a SKU for ${countryCode}.`);
+  console.log(`[Gooten] Selected SKU for ${countryCode}: ${chosen}`);
+  return chosen;
 }
 
 // ---------- Nodemailer ----------
@@ -159,9 +213,9 @@ const transporter = nodemailer.createTransport({
 app.use(express.static("public"));
 app.use((req, res, next) => {
   if (req.originalUrl === "/webhook") {
-    next();
+    next(); // Stripe webhook uses raw body parsing below
   } else {
-    express.json()(req, res, next);
+    express.json({ limit: "2mb" })(req, res, next); // keep JSON body small
   }
 });
 
@@ -252,7 +306,7 @@ app.get("/prediction-status/:id", async (req, res) => {
   }
 });
 
-// ---------- Debug route ----------
+// ---------- Debug: see what SKUs are enabled ----------
 app.get("/debug/gooten-variants", async (req, res) => {
   try {
     const country = normalizeCountryCode(req.query.country || "US");
@@ -283,6 +337,7 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
   };
 
   const countryCode = getShipCountryCode(shipTo);
+
   const sku = await pickSkuForCountry({
     preferredSku: (GOOTEN_STICKER_SKU || "").trim() || null,
     countryCode,
@@ -296,9 +351,9 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     Items: [
       {
         Quantity: 1,
-        SKU: sku,
+        SKU: sku,                    // validated country-enabled catalog SKU
         ShipType: "standard",
-        Images: [{ Url: imageUrl }],
+        Images: [{ Url: imageUrl }], // dynamic art
         SourceId: safeId,
       },
     ],
@@ -343,7 +398,7 @@ app.post("/create-checkout-session", async (req, res) => {
               name: "Boat Sticker",
               images: [imageUrl],
             },
-            unit_amount: 700,
+            unit_amount: 700, // $7.00 (adjust)
           },
           quantity: 1,
         },
@@ -367,7 +422,7 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// ---------- Webhook ----------
+// ---------- Stripe webhook -> Gooten order + email ----------
 app.post(
   "/webhook",
   express.raw({ type: "application/json" }),
@@ -414,6 +469,7 @@ app.post(
             postal_code: shipping.postal_code || shipping.zip,
             phone: session.customer_details?.phone,
           },
+          // Trimmed inside submitGootenOrder.
           sourceId: session.id,
         });
         console.log("✅ Gooten order created:", order);
@@ -445,6 +501,7 @@ app.post(
         console.error("❌ Error sending order email:", mailErr);
       }
     }
+
     res.json({ received: true });
   }
 );
