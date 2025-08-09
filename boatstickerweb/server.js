@@ -2,12 +2,17 @@ import express from "express";
 import multer from "multer";
 import fetch from "node-fetch";
 import FormData from "form-data";
-import fs from "fs";
 import Stripe from "stripe";
 import nodemailer from "nodemailer";
+import sharp from "sharp"; // <-- for JPEG/WEBP -> PNG
 
 const app = express();
-const upload = multer({ dest: "uploads/" });
+
+// Memory storage + strict file size (keeps RAM controlled)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 12 * 1024 * 1024 }, // 12MB
+});
 
 const {
   // Image gen
@@ -77,18 +82,13 @@ const DEFAULT_PAGE_SIZE = 200;
 async function fetchWithSizeCap(url, capBytes = MAX_VARIANTS_BODY_BYTES) {
   const resp = await fetch(url);
   if (!resp.ok) {
-    // read small error text safely
     const errTxt = await resp.text();
     throw new Error(`Gooten productvariants failed: ${resp.status} ${errTxt}`);
   }
-  // Stream and cap size to avoid OOM
   const reader = resp.body.getReader ? resp.body.getReader() : null;
   if (!reader) {
-    // fallback (older node-fetch): still do .text(), not ideal but okay
     const txt = await resp.text();
-    if (txt.length > capBytes) {
-      throw new Error(`Gooten productvariants body exceeded ${capBytes} bytes`);
-    }
+    if (txt.length > capBytes) throw new Error(`Gooten productvariants body exceeded ${capBytes} bytes`);
     return txt;
   }
   let received = 0;
@@ -105,10 +105,7 @@ async function fetchWithSizeCap(url, capBytes = MAX_VARIANTS_BODY_BYTES) {
   }
   const merged = new Uint8Array(received);
   let offset = 0;
-  for (const c of chunks) {
-    merged.set(c, offset);
-    offset += c.byteLength;
-  }
+  for (const c of chunks) { merged.set(c, offset); offset += c.byteLength; }
   return new TextDecoder("utf-8").decode(merged);
 }
 
@@ -128,13 +125,9 @@ async function fetchVariantsForCountry(countryCode) {
 
   const text = await fetchWithSizeCap(url);
 
-  // Parse JSON safely
   let data;
-  try {
-    data = JSON.parse(text);
-  } catch (e) {
-    throw new Error(`Failed to parse productvariants JSON (${text.length} bytes): ${e.message}`);
-  }
+  try { data = JSON.parse(text); }
+  catch (e) { throw new Error(`Failed to parse productvariants JSON (${text.length} bytes): ${e.message}`); }
 
   const list =
     data?.ProductVariants ||
@@ -154,10 +147,7 @@ async function fetchVariantsForCountry(countryCode) {
   });
 
   const simplified = enabled
-    .map((v) => ({
-      sku: v?.Sku || v?.SKU || "",
-      name: v?.Name || v?.VariantName || "",
-    }))
+    .map((v) => ({ sku: v?.Sku || v?.SKU || "", name: v?.Name || v?.VariantName || "" }))
     .filter((v) => v.sku);
 
   variantsCache.set(key, simplified);
@@ -221,10 +211,12 @@ app.use((req, res, next) => {
 
 // ---------- Image generation ----------
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  const uploadedPath = req.file.path;
-
   try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded (field name must be 'boatImage')." });
+    if (!REPLICATE_API_TOKEN || !OPENAI_API_KEY) {
+      return res.status(500).json({ error: "Missing API credentials (REPLICATE_API_TOKEN and/or OPENAI_API_KEY)." });
+    }
+
     const mode = (req.body?.mode || "sticker").toLowerCase();
     const isImageOnly = mode === "image";
 
@@ -232,24 +224,51 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       ? "Create a clean black and white line drawing of the boat shown in the input image only. Transparent background, no extra elements or shadows."
       : "Create a clean black and white line drawing of the boat shown in the input image only, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background, no extra elements or shadows.";
 
+    // Accept jpg/png/webp; convert everything to PNG to avoid CMYK/metadata issues
+    const allowed = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+    if (!allowed.has(req.file.mimetype)) {
+      return res.status(415).json({ error: `Unsupported file type ${req.file.mimetype}. Use JPG/PNG/WebP.` });
+    }
+
+    // Convert → PNG buffer (keeps alpha if present)
+    let pngBuffer;
+    try {
+      pngBuffer = await sharp(req.file.buffer).png({ compressionLevel: 9 }).toBuffer();
+    } catch (e) {
+      // Fallback: if sharp fails for any reason, just forward original buffer
+      console.warn("sharp conversion failed, forwarding original buffer:", e?.message);
+      pngBuffer = req.file.buffer;
+    } finally {
+      // free original quickly
+      req.file.buffer = null;
+    }
+
+    // 1) Upload PNG buffer to tmpfiles
     const form = new FormData();
-    form.append("file", fs.createReadStream(uploadedPath), req.file.originalname);
+    form.append("file", pngBuffer, {
+      filename: "upload.png",
+      contentType: "image/png",
+    });
 
     const uploadResp = await fetch("https://tmpfiles.org/api/v1/upload", {
       method: "POST",
       body: form,
       headers: form.getHeaders(),
     });
-    const uploadData = await uploadResp.json();
 
-    if (!uploadData?.data?.url) {
-      return res.status(500).json({ error: "No URL returned from tmpfiles" });
+    if (!uploadResp.ok) {
+      const txt = await uploadResp.text().catch(() => "");
+      return res.status(502).json({ error: `tmpfiles upload failed: ${uploadResp.status}`, details: txt.slice(0, 500) });
     }
 
-    let imageUrl = uploadData.data.url;
-    if (!imageUrl.includes("/dl/")) {
-      imageUrl = imageUrl.replace("tmpfiles.org/", "tmpfiles.org/dl/");
-    }
+    const uploadData = await uploadResp.json().catch(() => null);
+    const rawUrl = uploadData?.data?.url;
+    if (!rawUrl) return res.status(500).json({ error: "No URL returned from tmpfiles" });
+
+    const imageUrl = rawUrl.includes("/dl/") ? rawUrl : rawUrl.replace("tmpfiles.org/", "tmpfiles.org/dl/");
+
+    // 2) Create Replicate prediction with a valid version hash
+    const REPLICATE_VERSION = "54a0e1e1841cbb8c4ef226bd5e197798bef44acd0f63ed38338bda222205a7b0";
 
     const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
@@ -258,7 +277,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        version: "openai/gpt-image-1",
+        version: REPLICATE_VERSION,
         input: {
           prompt,
           input_images: [imageUrl],
@@ -274,20 +293,28 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       }),
     });
 
-    const replicateData = await replicateResp.json();
-    if (!replicateData.id) {
+    const text = await replicateResp.text();
+    let replicateData;
+    try { replicateData = JSON.parse(text); } catch { replicateData = null; }
+
+    if (!replicateResp.ok) {
+      return res.status(502).json({
+        error: `Replicate error ${replicateResp.status}`,
+        details: replicateData || text?.slice(0, 800) || "No body",
+      });
+    }
+
+    if (!replicateData?.id) {
       return res.status(500).json({
         error: "No prediction ID returned from Replicate",
-        details: replicateData,
+        details: replicateData || text?.slice(0, 800),
       });
     }
 
     res.json({ prediction: { id: replicateData.id } });
   } catch (error) {
     console.error("❌ Image generation error:", error);
-    res.status(500).json({ error: "Failed to generate image" });
-  } finally {
-    if (uploadedPath) fs.promises.unlink(uploadedPath).catch(() => {});
+    res.status(500).json({ error: error?.message || "Failed to generate image" });
   }
 });
 
@@ -298,11 +325,23 @@ app.get("/prediction-status/:id", async (req, res) => {
     const statusResp = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
       headers: { Authorization: `Token ${REPLICATE_API_TOKEN}` },
     });
-    const statusData = await statusResp.json();
+
+    const text = await statusResp.text();
+    let statusData;
+    try { statusData = JSON.parse(text); } catch { statusData = null; }
+
+    if (!statusResp.ok) {
+      return res.status(502).json({
+        error: `Replicate status error ${statusResp.status}`,
+        details: statusData || text?.slice(0, 800) || "No body",
+      });
+    }
+
+    // Client checks: statusData.status + statusData.output?.length
     res.json(statusData);
   } catch (error) {
     console.error("❌ Prediction status error:", error);
-    res.status(500).json({ error: "Failed to get prediction status" });
+    res.status(500).json({ error: error?.message || "Failed to get prediction status" });
   }
 });
 
@@ -351,9 +390,9 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     Items: [
       {
         Quantity: 1,
-        SKU: sku,                    // validated country-enabled catalog SKU
+        SKU: sku,
         ShipType: "standard",
-        Images: [{ Url: imageUrl }], // dynamic art
+        Images: [{ Url: imageUrl }],
         SourceId: safeId,
       },
     ],
@@ -394,11 +433,8 @@ app.post("/create-checkout-session", async (req, res) => {
         {
           price_data: {
             currency: "usd",
-            product_data: {
-              name: "Boat Sticker",
-              images: [imageUrl],
-            },
-            unit_amount: 700, // $7.00 (adjust)
+            product_data: { name: "Boat Sticker", images: [imageUrl] },
+            unit_amount: 700, // $7.00
           },
           quantity: 1,
         },
@@ -469,7 +505,6 @@ app.post(
             postal_code: shipping.postal_code || shipping.zip,
             phone: session.customer_details?.phone,
           },
-          // Trimmed inside submitGootenOrder.
           sourceId: session.id,
         });
         console.log("✅ Gooten order created:", order);
