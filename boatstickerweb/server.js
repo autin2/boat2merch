@@ -36,35 +36,45 @@ const {
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
 // ---------- Static sticker config ----------
-/**
- * REQUIRED: Set to Die-Cut Stickers product id from Gooten (string/number).
- * Grab it from the "productvariants" call in your browser Network tab.
- */
 const GOOTEN_PRODUCT_ID = "PUT_PRODUCT_ID_HERE"; // e.g. "1089"
-
-const DESIRED_SIZE = "525x725";     // e.g. "4x4", "5x5", "525x725"
-const DESIRED_PACK = "1Pack";       // e.g. "1Pack", "10Pack"
-const DESIRED_VARIANT = "Single";   // depends on catalog naming
+const DESIRED_SIZE = "525x725";
+const DESIRED_PACK = "1Pack";
+const DESIRED_VARIANT = "Single";
 
 // ---------- Helpers ----------
 const MAX_SOURCEID_LEN = 50;
 const safeSourceId = (id) => (id ? String(id).slice(0, MAX_SOURCEID_LEN) : undefined);
 
+function normalizeCountryCode(input, fallback = "US") {
+  if (!input) return fallback;
+  const raw = String(input).trim().toUpperCase();
+  if (/^[A-Z]{2}$/.test(raw)) return raw;
+  const MAP = {
+    "UNITED STATES": "US",
+    "UNITED STATES OF AMERICA": "US",
+    "USA": "US",
+    "U.S.": "US",
+    "U.S.A.": "US",
+    "AMERICA": "US",
+    "CANADA": "CA"
+  };
+  return MAP[raw] || fallback;
+}
+
 function getShipCountryCode(addr) {
   const c =
     addr?.country ||
     addr?.CountryCode ||
-    (typeof addr?.Country === "string" ? addr.Country : null) ||
-    "US";
-  return String(c).toUpperCase();
+    (typeof addr?.Country === "string" ? addr.Country : null);
+  return normalizeCountryCode(c, "US");
 }
 
 async function fetchVariantsForCountry(countryCode) {
   if (!GOOTEN_PRODUCT_ID) {
-    throw new Error("GOOTEN_PRODUCT_ID missing. Set the Die-Cut Stickers product id at the top of server.js.");
+    throw new Error("GOOTEN_PRODUCT_ID missing.");
   }
   if (!GOOTEN_RECIPE_ID) {
-    throw new Error("GOOTEN_RECIPE_ID missing. Set it in your Render env vars.");
+    throw new Error("GOOTEN_RECIPE_ID missing.");
   }
 
   const url =
@@ -87,7 +97,6 @@ async function fetchVariantsForCountry(countryCode) {
     (Array.isArray(data) ? data : []) ||
     [];
 
-  // Enabled for the given country
   const enabled = list.filter((v) => {
     const enabledCountries = v?.IsEnabledIn || v?.EnabledIn || v?.AvailableIn || [];
     const flag =
@@ -106,21 +115,18 @@ async function fetchVariantsForCountry(countryCode) {
 }
 
 function pickPreferredVariant(enabled, { size, pack, variant }) {
-  // Strict match
   const strict = enabled.find((v) => {
     const hay = `${v.sku} ${v.name}`;
     return hay.includes(size) && hay.includes(pack) && hay.includes(variant);
   });
   if (strict) return strict.sku;
 
-  // Partial by size+pack
   const bySizePack = enabled.find((v) => {
     const hay = `${v.sku} ${v.name}`;
     return hay.includes(size) && hay.includes(pack);
   });
   if (bySizePack) return bySizePack.sku;
 
-  // Fallback
   return enabled[0]?.sku;
 }
 
@@ -129,22 +135,16 @@ async function pickSkuForCountry({ preferredSku, countryCode }) {
   if (!enabled.length) {
     throw new Error(`No enabled variants for ${countryCode}.`);
   }
-
-  // If env override present, validate it's enabled for this country
   if (preferredSku) {
     const ok = enabled.some((v) => v.sku === preferredSku);
     if (ok) return preferredSku;
     console.warn(`[Gooten] Env SKU "${preferredSku}" not enabled for ${countryCode}. Falling back.`);
   }
-
-  const chosen = pickPreferredVariant(enabled, {
+  return pickPreferredVariant(enabled, {
     size: DESIRED_SIZE,
     pack: DESIRED_PACK,
     variant: DESIRED_VARIANT,
   });
-
-  if (!chosen) throw new Error(`Could not pick a SKU for ${countryCode}.`);
-  return chosen;
 }
 
 // ---------- Nodemailer ----------
@@ -159,7 +159,7 @@ const transporter = nodemailer.createTransport({
 app.use(express.static("public"));
 app.use((req, res, next) => {
   if (req.originalUrl === "/webhook") {
-    next(); // Stripe webhook uses raw body parsing below
+    next();
   } else {
     express.json()(req, res, next);
   }
@@ -171,7 +171,6 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   const uploadedPath = req.file.path;
 
   try {
-    // mode: "image" (line art only) | "sticker" (line art + white contour)
     const mode = (req.body?.mode || "sticker").toLowerCase();
     const isImageOnly = mode === "image";
 
@@ -179,7 +178,6 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       ? "Create a clean black and white line drawing of the boat shown in the input image only. Transparent background, no extra elements or shadows."
       : "Create a clean black and white line drawing of the boat shown in the input image only, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background, no extra elements or shadows.";
 
-    // 1) upload to tmpfiles.org to get public URL
     const form = new FormData();
     form.append("file", fs.createReadStream(uploadedPath), req.file.originalname);
 
@@ -199,7 +197,6 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       imageUrl = imageUrl.replace("tmpfiles.org/", "tmpfiles.org/dl/");
     }
 
-    // 2) call Replicate (OpenAI gpt-image-1 via Replicate)
     const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
@@ -217,7 +214,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
           moderation: "auto",
           aspect_ratio: "1:1",
           number_of_images: 1,
-          output_format: "png", // PNG best for stickers
+          output_format: "png",
           output_compression: 90,
         },
       }),
@@ -255,10 +252,10 @@ app.get("/prediction-status/:id", async (req, res) => {
   }
 });
 
-// ---------- Debug: see what SKUs are enabled ----------
+// ---------- Debug route ----------
 app.get("/debug/gooten-variants", async (req, res) => {
   try {
-    const country = String(req.query.country || "US").toUpperCase();
+    const country = normalizeCountryCode(req.query.country || "US");
     const enabled = await fetchVariantsForCountry(country);
     res.json({ country, enabledCount: enabled.length, enabled });
   } catch (e) {
@@ -269,7 +266,7 @@ app.get("/debug/gooten-variants", async (req, res) => {
 // ---------- Gooten order helper ----------
 async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
   if (!GOOTEN_RECIPE_ID || !GOOTEN_PARTNER_BILLING_KEY) {
-    throw new Error("Gooten env vars missing (GOOTEN_RECIPE_ID / GOOTEN_PARTNER_BILLING_KEY).");
+    throw new Error("Missing Gooten recipe/billing env vars.");
   }
 
   const shipTo = {
@@ -279,15 +276,13 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     Line2: address?.line2 || "",
     City: address?.city || "",
     State: address?.state || "",
-    CountryCode: (address?.country || "US").toUpperCase(),
+    CountryCode: normalizeCountryCode(address?.country || "US"),
     PostalCode: address?.postal_code || address?.zip || "",
     Phone: address?.phone || "0000000000",
     Email: email || "unknown@example.com",
   };
 
   const countryCode = getShipCountryCode(shipTo);
-
-  // Validate env override for the ship country; else pick automatically.
   const sku = await pickSkuForCountry({
     preferredSku: (GOOTEN_STICKER_SKU || "").trim() || null,
     countryCode,
@@ -301,9 +296,9 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     Items: [
       {
         Quantity: 1,
-        SKU: sku,                    // validated country-enabled catalog SKU
+        SKU: sku,
         ShipType: "standard",
-        Images: [{ Url: imageUrl }], // dynamic art
+        Images: [{ Url: imageUrl }],
         SourceId: safeId,
       },
     ],
@@ -348,7 +343,7 @@ app.post("/create-checkout-session", async (req, res) => {
               name: "Boat Sticker",
               images: [imageUrl],
             },
-            unit_amount: 700, // $7.00 (adjust as needed)
+            unit_amount: 700,
           },
           quantity: 1,
         },
@@ -372,17 +367,7 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// ---------- Placeholder (unused) ----------
-app.post("/create-order", async (req, res) => {
-  try {
-    res.json({ message: "Order processing placeholder" });
-  } catch (err) {
-    console.error("❌ /create-order error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- Stripe webhook -> Gooten order + email ----------
+// ---------- Webhook ----------
 app.post(
   "/webhook",
   express.raw({ type: "application/json" }),
@@ -405,7 +390,6 @@ app.post(
       const buyerName =
         session.metadata?.buyerName || session.customer_details?.name || "Customer";
 
-      // Prefer Stripe shipping_details; fallback to your metadata JSON
       const shipping =
         session.shipping_details?.address ||
         (() => {
@@ -430,7 +414,6 @@ app.post(
             postal_code: shipping.postal_code || shipping.zip,
             phone: session.customer_details?.phone,
           },
-          // Trimmed inside submitGootenOrder.
           sourceId: session.id,
         });
         console.log("✅ Gooten order created:", order);
@@ -438,7 +421,6 @@ app.post(
         console.error("❌ Gooten order error:", e);
       }
 
-      // Notify you via email
       try {
         const emailHtml = `
           <h2>New Sticker Order</h2>
@@ -463,8 +445,6 @@ app.post(
         console.error("❌ Error sending order email:", mailErr);
       }
     }
-
-    // Respond fast so Stripe stops retrying
     res.json({ received: true });
   }
 );
