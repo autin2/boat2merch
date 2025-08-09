@@ -8,75 +8,6 @@
   <meta name="author" content="Boat2Merch" />
   <title>Boat2Merch — Turn Your Boat into Stickers & Shirts</title>
   <link rel="stylesheet" href="style.css" />
-
-  <style>
-    /* Layout shell */
-    .container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
-    header.site-header { background:#1e1e1e; border-bottom:1px solid #2a2a2a; position: sticky; top:0; z-index: 20; }
-    .nav-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; }
-    .brand { display:flex; align-items:center; gap:.5rem; font-weight:700; font-size:1.1rem; }
-    .brand .logo-emoji { font-size:1.3rem; }
-    nav.topnav a { color:#cfcfcf; text-decoration:none; margin-left:18px; }
-    nav.topnav a:hover, nav.topnav a.active { color:#fff; border-bottom:2px solid #ff9800; padding-bottom:4px; }
-
-    /* Hero */
-    .hero { background: linear-gradient(135deg,#1e1e1e,#2a2a2a); }
-    .hero-inner { display:grid; grid-template-columns: 1.1fr 0.9fr; gap:40px; padding:64px 0; }
-    @media (max-width: 900px){ .hero-inner{ grid-template-columns:1fr; } }
-
-    .headline { font-size: clamp(1.8rem, 2.8vw, 2.6rem); margin:0 0 10px; }
-    .subhead { color:#cfcfcf; margin:0 0 24px; }
-
-    /* Card shells */
-    .card { background:#1b1b1b; border:1px solid #2c2c2c; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.25); }
-    .card.pad { padding:20px; }
-    .muted { color:#bcbcbc; }
-
-    /* Smaller generate box */
-    .card.generate-box {
-      background: #1b1b1b;
-      border: 1px solid #2c2c2c;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,.25);
-      padding: 14px 16px;
-      display: inline-block;
-      text-align: center;
-      margin-top: 10px;
-    }
-
-    /* Controls row */
-    .controls { display:flex; align-items:center; flex-wrap: wrap; gap:12px; justify-content: center; }
-
-    /* Result panel */
-    #resultPanel { display:none; margin-top:16px; }
-    .result-img { max-width:100%; border-radius:10px; display:block; margin:14px auto; }
-    .btn-row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
-
-    /* Buttons */
-    .btn { border:none; cursor:pointer; border-radius:8px; padding:12px 18px; font-weight:600; }
-    .btn-primary { background:#ff9800; color:#121212; }
-    .btn-primary:hover { background:#e68900; }
-    .btn-secondary { background:#03a9f4; color:#121212; }
-    .btn-secondary:hover { background:#0288d1; }
-    .btn-ghost { background:#2a2a2a; color:#eaeaea; border:1px solid #3a3a3a; }
-
-    /* Loading */
-    .loading-container { display:flex; gap:12px; align-items:center; background:#232323; border:1px solid #333; border-radius:10px; padding:12px 14px; }
-    .spinner { width:22px; height:22px; border:3px solid #444; border-top-color:#ff9800; border-radius:50%; animation:spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg);} }
-
-    /* Feature grid */
-    .features { padding:50px 0; }
-    .feature-grid { display:grid; gap:18px; grid-template-columns: repeat(3, 1fr); }
-    @media (max-width: 900px){ .feature-grid{ grid-template-columns:1fr; } }
-    .feature-card h3 { margin:0 0 8px; }
-
-    /* CTA */
-    .cta { background:#1a1a1a; text-align:center; padding:56px 0; border-top:1px solid #272727; }
-
-    /* Footer */
-    footer { text-align:center; padding:18px 0 28px; color:#9a9a9a; background:#1e1e1e; border-top:1px solid #262626; }
-  </style>
 </head>
 <body>
   <!-- Header -->
@@ -103,20 +34,22 @@
         <h1 class="headline">Turn your boat photo into a clean, die-cut sticker — instantly.</h1>
         <p class="subhead">Upload a photo. Our AI returns a crisp line-art with an optional white contour, ready for stickers, shirts, and more.</p>
 
-        <!-- Action box (smaller) -->
-        <div class="card generate-box" role="region" aria-label="Upload and settings">
+        <!-- Action card -->
+        <div class="card pad" role="region" aria-label="Upload and settings">
+          <!-- Hidden system file input -->
           <input type="file" id="boatUpload" accept="image/*" style="display:none" />
+
           <div class="controls">
             <button class="btn btn-primary" id="btnImage">Generate an Image</button>
             <button class="btn btn-secondary" id="btnSticker">Generate a Sticker</button>
-            <button class="btn btn-ghost" id="editBtn" style="display:none;">Buy as a sticker</button>
+            <button class="btn btn-ghost" id="editBtn">Buy as a sticker</button>
           </div>
 
           <!-- Status -->
           <div id="statusArea" style="margin-top:12px;" aria-live="polite"></div>
 
           <!-- Result -->
-          <div id="resultPanel" class="card pad" style="margin-top:12px;">
+          <div id="resultPanel" class="card pad" style="margin-top:12px; display:none;">
             <p class="muted" style="margin:0 0 8px;">Your AI-generated output:</p>
             <img id="resultImage" class="result-img" alt="AI generated boat drawing" />
             <div class="btn-row">
@@ -191,14 +124,17 @@
 
     let currentMode = "image"; // "image" | "sticker"
 
+    // Button handlers set mode and open file dialog
     btnImage.addEventListener("click", () => { currentMode = "image"; boatUpload.click(); });
     btnSticker.addEventListener("click", () => { currentMode = "sticker"; boatUpload.click(); });
 
+    // Handle upload + polling
     boatUpload.addEventListener("change", async () => {
       if (boatUpload.files.length === 0) return;
 
+      // Reset UI
       resultPanel.style.display = "none";
-      editBtn.style.display = "none";
+      editBtn.classList.remove("visible");
       statusArea.innerHTML = `
         <div class="loading-container">
           <div class="spinner" aria-hidden="true"></div>
@@ -209,7 +145,7 @@
       const file = boatUpload.files[0];
       const formData = new FormData();
       formData.append("boatImage", file);
-      formData.append("mode", currentMode);
+      formData.append("mode", currentMode); // BACKEND will switch prompts based on this
 
       try {
         const uploadResp = await fetch("/generate-image", { method: "POST", body: formData });
@@ -219,7 +155,7 @@
         const predictionId = prediction?.id;
         if (!predictionId) throw new Error("No prediction ID returned");
 
-        const pollInterval = 2000;
+        const pollInterval = 2000; // ms
         const maxAttempts = 30;
         let attempts = 0;
 
@@ -230,12 +166,15 @@
 
           if (statusData.status === "succeeded" && statusData.output?.length) {
             const imageUrl = statusData.output[0];
+
+            // Update UI
             statusArea.innerHTML = "";
             resultImage.src = imageUrl;
             downloadBtn.href = imageUrl;
             resultPanel.style.display = "block";
 
-            editBtn.style.display = "inline-block";
+            // Buttons: both go to buy
+            editBtn.classList.add("visible");
             const goBuy = () => window.location.href = "buy.html?img=" + encodeURIComponent(imageUrl);
             editBtn.onclick = goBuy;
             buyBtn.onclick = goBuy;
@@ -250,11 +189,13 @@
             }
           }
         }
+
         poll();
       } catch (err) {
         console.error(err);
         statusArea.innerHTML = `<div class="card pad" style="border-color:#733;">Error: ${err.message}</div>`;
       } finally {
+        // clear the input so selecting the same file again re-triggers change
         boatUpload.value = "";
       }
     });
