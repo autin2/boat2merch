@@ -35,11 +35,6 @@
 
     /* Controls row */
     .controls { display:flex; align-items:center; flex-wrap: wrap; gap:12px; }
-    .settings-box {
-      display:flex; align-items:center; gap:10px;
-      background:#232323; border:1px solid #323232; border-radius:8px; padding:8px 12px;
-    }
-    .settings-box input[type="checkbox"]{ transform: scale(1.15); cursor:pointer; }
 
     /* Result panel (hidden until ready) */
     #resultPanel { display:none; margin-top:16px; }
@@ -95,7 +90,7 @@
       <!-- Left: copy + controls -->
       <div>
         <h1 class="headline">Turn your boat photo into a clean, die-cut sticker — instantly.</h1>
-        <p class="subhead">Upload a photo. Our AI returns a crisp line-art with a white contour, ready for stickers, shirts, and more.</p>
+        <p class="subhead">Upload a photo. Our AI returns a crisp line-art with an optional white contour, ready for stickers, shirts, and more.</p>
 
         <!-- Action card -->
         <div class="card pad" role="region" aria-label="Upload and settings">
@@ -103,14 +98,9 @@
           <input type="file" id="boatUpload" accept="image/*" style="display:none" />
 
           <div class="controls">
-            <button class="btn btn-primary" id="uploadBtn">Upload photo</button>
-            <button class="btn btn-secondary" id="editBtn" style="display:none;">Buy as a sticker</button>
-
-            <!-- Settings -->
-            <div class="settings-box" title="Output options">
-              <input type="checkbox" id="stickerOption" checked />
-              <label for="stickerOption" class="muted">Sticker</label>
-            </div>
+            <button class="btn btn-primary" id="btnImage">Generate an Image</button>
+            <button class="btn btn-secondary" id="btnSticker">Generate a Sticker</button>
+            <button class="btn btn-ghost" id="editBtn" style="display:none;">Buy as a sticker</button>
           </div>
 
           <!-- Status -->
@@ -118,7 +108,7 @@
 
           <!-- Result -->
           <div id="resultPanel" class="card pad" style="margin-top:12px;">
-            <p class="muted" style="margin:0 0 8px;">Your AI-generated drawing:</p>
+            <p class="muted" style="margin:0 0 8px;">Your AI-generated output:</p>
             <img id="resultImage" class="result-img" alt="AI generated boat drawing" />
             <div class="btn-row">
               <a id="downloadBtn" class="btn btn-ghost" download="boat-ai-design.png">Download</a>
@@ -128,13 +118,15 @@
         </div>
       </div>
 
-      <!-- Right: simple explainer card -->
+      <!-- Right: expanded explainer -->
       <aside class="card pad">
-        <h2 style="margin:0 0 6px;">How it works</h2>
+        <h2 style="margin:0 0 10px;">How it works</h2>
         <ol class="muted" style="margin:10px 0 0; padding-left:18px;">
-          <li>Upload a clear side or 3/4 view of your boat.</li>
-          <li>We convert it to clean black-and-white line art with a white contour.</li>
-          <li>Download or order as a sticker in seconds.</li>
+          <li><strong>Pick your mode:</strong> <em>Generate an Image</em> gives you a clean black-and-white line drawing. <em>Generate a Sticker</em> adds a bold white contour for die-cut stickers.</li>
+          <li><strong>Upload a clear photo:</strong> Side or 3/4 views work best. Keep the boat centered with minimal background clutter.</li>
+          <li><strong>We process it:</strong> Our model cleans lines, simplifies shapes, and (for stickers) adds the white outline on a transparent background.</li>
+          <li><strong>Download or order:</strong> Save the PNG/WebP, or jump straight to checkout for pro-quality die-cut stickers.</li>
+          <li class="muted"><small>Tip: Higher-resolution photos = cleaner edges and fewer artifacts.</small></li>
         </ol>
       </aside>
     </div>
@@ -146,11 +138,11 @@
       <div class="feature-grid">
         <div class="feature-card card pad">
           <h3>🎨 Clean Line-Art</h3>
-          <p class="muted">High-contrast vector-style look that prints beautifully as die-cut stickers.</p>
+          <p class="muted">High-contrast look that prints beautifully on dark or light surfaces.</p>
         </div>
         <div class="feature-card card pad">
           <h3>🛍 Print-Ready</h3>
-          <p class="muted">Transparent background and white outline — no extra editing needed.</p>
+          <p class="muted">Transparent background and (optional) white outline — no extra editing needed.</p>
         </div>
         <div class="feature-card card pad">
           <h3>⚡ Fast</h3>
@@ -163,9 +155,9 @@
   <!-- CTA -->
   <section class="cta">
     <div class="container">
-      <h2 style="margin:0 0 10px;">Ready to sticker your boat?</h2>
-      <p class="muted" style="margin:0 0 18px;">Upload a photo and let the AI do the rest.</p>
-      <button class="btn btn-primary" onclick="document.getElementById('uploadBtn').click()">Get started</button>
+      <h2 style="margin:0 0 10px;">Ready to try it?</h2>
+      <p class="muted" style="margin:0 0 18px;">Choose your mode above and upload a photo.</p>
+      <button class="btn btn-primary" onclick="document.getElementById('btnImage').click()">Get started</button>
     </div>
   </section>
 
@@ -178,18 +170,21 @@
 
   <!-- Scripts -->
   <script>
-    const uploadBtn = document.getElementById("uploadBtn");
     const boatUpload = document.getElementById("boatUpload");
+    const btnImage = document.getElementById("btnImage");
+    const btnSticker = document.getElementById("btnSticker");
     const editBtn = document.getElementById("editBtn");
     const statusArea = document.getElementById("statusArea");
     const resultPanel = document.getElementById("resultPanel");
     const resultImage = document.getElementById("resultImage");
     const downloadBtn = document.getElementById("downloadBtn");
     const buyBtn = document.getElementById("buyBtn");
-    const stickerOption = document.getElementById("stickerOption");
 
-    // Open file dialog
-    uploadBtn.addEventListener("click", () => boatUpload.click());
+    let currentMode = "image"; // "image" | "sticker"
+
+    // Button handlers set mode and open file dialog
+    btnImage.addEventListener("click", () => { currentMode = "image"; boatUpload.click(); });
+    btnSticker.addEventListener("click", () => { currentMode = "sticker"; boatUpload.click(); });
 
     // Handle upload + polling
     boatUpload.addEventListener("change", async () => {
@@ -201,14 +196,14 @@
       statusArea.innerHTML = `
         <div class="loading-container">
           <div class="spinner" aria-hidden="true"></div>
-          <div>Uploading and generating image… This can take up to 2 minutes.</div>
+          <div>Uploading and generating (${currentMode})… This can take up to 2 minutes.</div>
         </div>
       `;
 
       const file = boatUpload.files[0];
       const formData = new FormData();
       formData.append("boatImage", file);
-      formData.append("sticker", String(stickerOption.checked)); // reserved for future use
+      formData.append("mode", currentMode); // BACKEND will switch prompts based on this
 
       try {
         const uploadResp = await fetch("/generate-image", { method: "POST", body: formData });
@@ -236,10 +231,11 @@
             downloadBtn.href = imageUrl;
             resultPanel.style.display = "block";
 
-            // Buttons
+            // Buttons: both go to buy
             editBtn.style.display = "inline-block";
-            editBtn.onclick = () => { window.location.href = "buy.html?img=" + encodeURIComponent(imageUrl); };
-            buyBtn.onclick = () => { window.location.href = "buy.html?img=" + encodeURIComponent(imageUrl); };
+            const goBuy = () => window.location.href = "buy.html?img=" + encodeURIComponent(imageUrl);
+            editBtn.onclick = goBuy;
+            buyBtn.onclick = goBuy;
 
           } else if (statusData.status === "failed") {
             statusArea.innerHTML = `<div class="card pad" style="border-color:#733;">Generation failed. Please try a different photo.</div>`;
@@ -256,6 +252,9 @@
       } catch (err) {
         console.error(err);
         statusArea.innerHTML = `<div class="card pad" style="border-color:#733;">Error: ${err.message}</div>`;
+      } finally {
+        // clear the input so selecting the same file again re-triggers change
+        boatUpload.value = "";
       }
     });
   </script>
