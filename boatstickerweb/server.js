@@ -29,7 +29,7 @@ const {
   GOOTEN_PARTNER_BILLING_KEY,
   GOOTEN_TEST_MODE,
 
-  // Optional override (validated; if invalid for country, we ignore it)
+  // Optional override (validated against country; ignored if unavailable)
   GOOTEN_STICKER_SKU,
 } = process.env;
 
@@ -63,9 +63,15 @@ async function fetchVariantsForCountry(countryCode) {
   if (!GOOTEN_PRODUCT_ID) {
     throw new Error("GOOTEN_PRODUCT_ID missing. Set the Die-Cut Stickers product id at the top of server.js.");
   }
-  const url = `https://api.print.io/api/v/5/source/api/productvariants/?productid=${encodeURIComponent(
-    GOOTEN_PRODUCT_ID
-  )}&countrycode=${encodeURIComponent(countryCode)}`;
+  if (!GOOTEN_RECIPE_ID) {
+    throw new Error("GOOTEN_RECIPE_ID missing. Set it in your Render env vars.");
+  }
+
+  const url =
+    `https://api.print.io/api/v/5/source/api/productvariants/` +
+    `?recipeid=${encodeURIComponent(GOOTEN_RECIPE_ID)}` +
+    `&productid=${encodeURIComponent(GOOTEN_PRODUCT_ID)}` +
+    `&countrycode=${encodeURIComponent(countryCode)}`;
 
   const resp = await fetch(url);
   if (!resp.ok) {
@@ -84,32 +90,37 @@ async function fetchVariantsForCountry(countryCode) {
   // Enabled for the given country
   const enabled = list.filter((v) => {
     const enabledCountries = v?.IsEnabledIn || v?.EnabledIn || v?.AvailableIn || [];
-    const flag = v?.IsEnabled === true || v?.IsEnabledInUS === true || v?.IsEnabledInCA === true;
+    const flag =
+      v?.IsEnabled === true ||
+      v?.IsEnabledInUS === true ||
+      v?.IsEnabledInCA === true;
     return flag || (Array.isArray(enabledCountries) && enabledCountries.includes(countryCode));
   });
 
-  return enabled.map((v) => ({
-    sku: v?.Sku || v?.SKU || "",
-    name: v?.Name || v?.VariantName || "",
-  })).filter(v => v.sku);
+  return enabled
+    .map((v) => ({
+      sku: v?.Sku || v?.SKU || "",
+      name: v?.Name || v?.VariantName || "",
+    }))
+    .filter((v) => v.sku);
 }
 
 function pickPreferredVariant(enabled, { size, pack, variant }) {
-  // Try strict match first
+  // Strict match
   const strict = enabled.find((v) => {
     const hay = `${v.sku} ${v.name}`;
     return hay.includes(size) && hay.includes(pack) && hay.includes(variant);
   });
   if (strict) return strict.sku;
 
-  // Try partial matches by size+pack
+  // Partial by size+pack
   const bySizePack = enabled.find((v) => {
     const hay = `${v.sku} ${v.name}`;
     return hay.includes(size) && hay.includes(pack);
   });
   if (bySizePack) return bySizePack.sku;
 
-  // Fallback: first enabled
+  // Fallback
   return enabled[0]?.sku;
 }
 
@@ -119,7 +130,7 @@ async function pickSkuForCountry({ preferredSku, countryCode }) {
     throw new Error(`No enabled variants for ${countryCode}.`);
   }
 
-  // If we have an env override, but it's not enabled for this country, ignore it.
+  // If env override present, validate it's enabled for this country
   if (preferredSku) {
     const ok = enabled.some((v) => v.sku === preferredSku);
     if (ok) return preferredSku;
@@ -132,9 +143,7 @@ async function pickSkuForCountry({ preferredSku, countryCode }) {
     variant: DESIRED_VARIANT,
   });
 
-  if (!chosen) {
-    throw new Error(`Could not pick a SKU for ${countryCode}.`);
-  }
+  if (!chosen) throw new Error(`Could not pick a SKU for ${countryCode}.`);
   return chosen;
 }
 
@@ -208,7 +217,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
           moderation: "auto",
           aspect_ratio: "1:1",
           number_of_images: 1,
-          output_format: "png",
+          output_format: "png", // PNG best for stickers
           output_compression: 90,
         },
       }),
@@ -292,7 +301,7 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     Items: [
       {
         Quantity: 1,
-        SKU: sku,                    // validated US/CA-enabled catalog SKU
+        SKU: sku,                    // validated country-enabled catalog SKU
         ShipType: "standard",
         Images: [{ Url: imageUrl }], // dynamic art
         SourceId: safeId,
@@ -339,7 +348,7 @@ app.post("/create-checkout-session", async (req, res) => {
               name: "Boat Sticker",
               images: [imageUrl],
             },
-            unit_amount: 700, // $7.00
+            unit_amount: 700, // $7.00 (adjust as needed)
           },
           quantity: 1,
         },
