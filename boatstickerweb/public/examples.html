@@ -3,52 +3,255 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Example AI-generated boat artwork for stickers, shirts, and merchandise." />
-  <meta name="keywords" content="boat sticker examples, boat shirt designs, AI boat art gallery" />
-  <meta name="author" content="Your Brand Name" />
+  <meta name="description" content="See real examples of boat photos turned into merch-ready designs and stickers." />
+  <meta name="keywords" content="boat sticker examples, boat line art, die-cut stickers, print ready" />
+  <meta name="author" content="Boat2Merch" />
   <title>Examples - Boat2Merch</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    /* --- Examples page only --- */
+    .examples-wrap .card.pad { overflow: hidden; }
+    .carousel { position: relative; }
+    .examples-rail {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(220px, 280px);
+      gap: 14px;
+      overflow-x: auto;
+      padding: 8px 6px 10px;
+      scroll-snap-type: x mandatory;
+      scroll-behavior: smooth;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .examples-rail::-webkit-scrollbar { display: none; }
+
+    .ex-item {
+      scroll-snap-align: start;
+      background: #1b1b1b;
+      border: 1px solid #2c2c2c;
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.25);
+      overflow: hidden;
+    }
+    .ex-item img {
+      display: block;
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      background: #111;
+    }
+    .ex-caption {
+      padding: 10px 12px;
+      font-size: .95rem;
+      color: #bcbcbc;
+    }
+
+    .car-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      border: 1px solid #3a3a3a;
+      background: rgba(26,26,26,.8);
+      color: #eee;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      z-index: 5;
+      transition: background .2s ease, transform .2s ease;
+      backdrop-filter: blur(2px);
+    }
+    .car-btn:hover { background: rgba(42,42,42,.9); transform: translateY(-50%) scale(1.03); }
+    .car-btn:active { transform: translateY(-50%) scale(.98); }
+    .car-prev { left: 8px; }
+    .car-next { right: 8px; }
+
+    .dots { display: flex; gap: 6px; justify-content: center; margin-top: 10px; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: #3a3a3a; }
+    .dot.active { background: #ff9800; }
+
+    @media (prefers-reduced-motion: reduce) { .examples-rail { scroll-behavior: auto; } }
+
+    @media (max-width: 480px) {
+      .examples-rail { grid-auto-columns: minmax(70vw, 1fr); }
+      .ex-item img { height: 220px; }
+    }
+  </style>
 </head>
 <body>
 
   <!-- Header -->
-  <header>
-    <div class="logo">🚤 Boat2Merch</div>
-    <nav>
-      <a href="index.html">Home</a>
-      <a href="how-it-works.html">How It Works</a>
-      <a href="pricing.html">Pricing</a>
-      <a href="examples.html" class="active">Examples</a>
-      <a href="contact.html">Contact</a>
-    </nav>
+  <header class="site-header">
+    <div class="container nav-row">
+      <div class="brand">
+        <span class="logo-emoji">🚤</span> Boat2Merch
+      </div>
+      <nav class="topnav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="how-it-works.html">How It Works</a>
+        <a href="pricing.html">Pricing</a>
+        <a href="examples.html" class="active">Examples</a>
+        <a href="contact.html">Contact</a>
+      </nav>
+    </div>
   </header>
 
   <!-- Page Header -->
   <section class="page-header">
-    <h1>Example Boat Designs</h1>
-    <p>See AI-generated artwork of boats transformed into merch-ready designs.</p>
+    <div class="container">
+      <h1>Examples</h1>
+      <p class="muted">A few before/after style outputs from real boat photos.</p>
+    </div>
   </section>
 
-  <!-- Gallery -->
-  <section class="gallery">
-    <div class="gallery-item">
-      <img src="images/freeman-2022-boat-1.jpg" alt="AI drawing of 2022 Freeman fishing boat 1" />
-      <p>2022 Freeman Boat - Design 1</p>
+  <!-- Carousel -->
+  <section class="examples-wrap">
+    <div class="container">
+      <div class="card pad">
+        <div class="carousel">
+          <button class="car-btn car-prev" aria-label="Previous examples" title="Previous">⟨</button>
+          <div class="examples-rail" id="examplesRail" aria-label="Example gallery">
+            <!-- Using the same path/filenames as the old page -->
+            <figure class="ex-item">
+              <img src="images/example1.png" alt="Clean line-art of center console boat" />
+              <figcaption class="ex-caption">Line-art (Image)</figcaption>
+            </figure>
+            <figure class="ex-item">
+              <img src="images/example2.png" alt="Sticker with white contour around sailboat" />
+              <figcaption class="ex-caption">Sticker (White Contour)</figcaption>
+            </figure>
+            <figure class="ex-item">
+              <img src="images/example3.png" alt="Bass boat simplified shapes" />
+              <figcaption class="ex-caption">Simplified Shapes</figcaption>
+            </figure>
+            <figure class="ex-item">
+              <img src="images/example4.png" alt="Yacht minimal black-and-white drawing" />
+              <figcaption class="ex-caption">Minimal B/W</figcaption>
+            </figure>
+            <figure class="ex-item">
+              <img src="images/example5.png" alt="Runabout line-art with high contrast" />
+              <figcaption class="ex-caption">High Contrast</figcaption>
+            </figure>
+            <figure class="ex-item">
+              <img src="images/example6.png" alt="Pontoon boat with die-cut border" />
+              <figcaption class="ex-caption">Die-cut Border</figcaption>
+            </figure>
+            <figure class="ex-item">
+              <img src="images/example7.png" alt="Fishing boat side view, crisp edges" />
+              <figcaption class="ex-caption">Crisp Edges</figcaption>
+            </figure>
+            <figure class="ex-item">
+              <img src="images/example8.png" alt="Catamaran outline, transparent background" />
+              <figcaption class="ex-caption">Transparent BG</figcaption>
+            </figure>
+            <figure class="ex-item">
+              <img src="images/example9.png" alt="Jet boat dynamic angle, simplified" />
+              <figcaption class="ex-caption">Dynamic Angle</figcaption>
+            </figure>
+            <figure class="ex-item">
+              <img src="images/example10.png" alt="Sailboat with detailed mast lines" />
+              <figcaption class="ex-caption">Fine Lines</figcaption>
+            </figure>
+          </div>
+          <button class="car-btn car-next" aria-label="Next examples" title="Next">⟩</button>
+        </div>
+        <div class="dots" id="dots" aria-hidden="true"></div>
+      </div>
     </div>
-    <div class="gallery-item">
-      <img src="images/freeman-2022-boat-2.jpg" alt="AI drawing of 2022 Freeman fishing boat 2" />
-      <p>2022 Freeman Boat - Design 2</p>
-    </div>
-    <div class="gallery-item">
-      <img src="images/freeman-2022-boat-3.jpg" alt="AI drawing of 2022 Freeman fishing boat 3" />
-      <p>2022 Freeman Boat - Design 3</p>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <div class="container">
+      <h2 style="margin:0 0 10px;">Make yours next</h2>
+      <p class="muted" style="margin:0 0 18px;">Upload your boat photo and get a merch-ready design in minutes.</p>
+      <a href="index.html"><button class="btn-primary">Upload Your Boat</button></a>
     </div>
   </section>
 
   <!-- Footer -->
   <footer>
-    <p>&copy; 2025 Boat2Merch | All rights reserved.</p>
+    <div class="container">
+      <p>&copy; 2025 Boat2Merch · All rights reserved.</p>
+    </div>
   </footer>
 
+  <script>
+    // Simple carousel controls + autoplay (pauses on hover/focus)
+    const rail = document.getElementById('examplesRail');
+    const prev = document.querySelector('.car-prev');
+    const next = document.querySelector('.car-next');
+    const dotsWrap = document.getElementById('dots');
+
+    const cards = Array.from(rail.children);
+
+    const visibleCount = () => {
+      const cardW = cards[0]?.getBoundingClientRect().width || 260;
+      return Math.max(1, Math.round(rail.clientWidth / (cardW + 14)));
+    };
+
+    function buildDots() {
+      dotsWrap.innerHTML = '';
+      const pages = Math.max(1, cards.length - visibleCount() + 1);
+      for (let i = 0; i < pages; i++) {
+        const d = document.createElement('div');
+        d.className = 'dot';
+        dotsWrap.appendChild(d);
+      }
+      updateDots();
+    }
+
+    function updateDots() {
+      const dots = dotsWrap.children;
+      if (!dots.length) return;
+      const cardW = cards[0]?.getBoundingClientRect().width || 260;
+      const page = Math.round(rail.scrollLeft / (cardW + 14));
+      Array.from(dots).forEach((dot, i) => {
+        dot.classList.toggle('active', i === page);
+      });
+    }
+
+    function scrollByAmount(dir = 1) {
+      const amount = Math.round(rail.clientWidth * 0.85);
+      rail.scrollBy({ left: amount * dir, behavior: 'smooth' });
+    }
+
+    prev.addEventListener('click', () => scrollByAmount(-1));
+    next.addEventListener('click', () => scrollByAmount(1));
+    rail.addEventListener('scroll', updateDots);
+    window.addEventListener('resize', buildDots);
+
+    // Autoplay
+    let auto = null, hovering = false;
+    function startAuto() {
+      if (auto) return;
+      auto = setInterval(() => {
+        if (hovering) return;
+        const nearEnd = (rail.scrollLeft + rail.clientWidth) >= (rail.scrollWidth - 4);
+        if (nearEnd) rail.scrollTo({ left: 0, behavior: 'smooth' });
+        else scrollByAmount(1);
+      }, 3500);
+    }
+    function stopAuto() { clearInterval(auto); auto = null; }
+
+    ['mouseenter','focusin'].forEach(ev => rail.addEventListener(ev, () => { hovering = true; }));
+    ['mouseleave','focusout'].forEach(ev => rail.addEventListener(ev, () => { hovering = false; }));
+
+    // Init
+    buildDots();
+    startAuto();
+
+    // Basic drag-to-scroll
+    let isDown = false, startX = 0, scrollStart = 0;
+    rail.addEventListener('pointerdown', e => {
+      isDown = true; startX = e.clientX; scrollStart = rail.scrollLeft;
+      rail.setPointerCapture(e.pointerId);
+    });
+    rail.addEventListener('pointermove', e => {
+      if (!isDown) return;
+      rail.scrollLeft = scrollStart - (e.clientX - startX);
+    });
+    rail.addEventListener('pointerup', () => { isDown = false; });
+  </script>
 </body>
 </html>
