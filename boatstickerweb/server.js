@@ -4,7 +4,7 @@ import fetch from "node-fetch";
 import FormData from "form-data";
 import Stripe from "stripe";
 import nodemailer from "nodemailer";
-import sharp from "sharp"; // <-- for JPEG/WEBP -> PNG
+import sharp from "sharp"; // JPEG/WEBP -> PNG, resize, auto-orient
 
 const app = express();
 
@@ -220,35 +220,35 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     const mode = (req.body?.mode || "sticker").toLowerCase();
     const isImageOnly = mode === "image";
 
+    // Force fidelity in wording
     const prompt = isImageOnly
-      ? "Create a clean black and white line drawing of the boat shown in the input image only. Transparent background, no extra elements or shadows."
-      : "Create a clean black and white line drawing of the boat shown in the input image only, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background, no extra elements or shadows.";
+      ? "Use the EXACT boat from the input image. Reproduce the same hull, proportions, windows and details. Output a clean black and white line drawing. Transparent background. Do NOT invent new elements, angles, or boats."
+      : "Use the EXACT boat from the input image. Reproduce the same hull, proportions, windows and details. Output a clean black and white line drawing with a THICK WHITE CONTOUR around the boat (die-cut look). Transparent background. Do NOT invent new elements, angles, or boats.";
 
-    // Accept jpg/png/webp; convert everything to PNG to avoid CMYK/metadata issues
+    // Accept jpg/png/webp; standardize to PNG, strip metadata, cap size
     const allowed = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
     if (!allowed.has(req.file.mimetype)) {
       return res.status(415).json({ error: `Unsupported file type ${req.file.mimetype}. Use JPG/PNG/WebP.` });
     }
 
-    // Convert → PNG buffer (keeps alpha if present)
     let pngBuffer;
     try {
-      pngBuffer = await sharp(req.file.buffer).png({ compressionLevel: 9 }).toBuffer();
+      // Resize to a sane max while preserving detail; strip metadata & auto-orient
+      pngBuffer = await sharp(req.file.buffer)
+        .rotate() // auto-orient using EXIF
+        .resize({ width: 1536, height: 1536, fit: "inside", withoutEnlargement: true })
+        .png({ compressionLevel: 9 })
+        .toBuffer();
     } catch (e) {
-      // Fallback: if sharp fails for any reason, just forward original buffer
       console.warn("sharp conversion failed, forwarding original buffer:", e?.message);
       pngBuffer = req.file.buffer;
     } finally {
-      // free original quickly
-      req.file.buffer = null;
+      req.file.buffer = null; // free memory
     }
 
     // 1) Upload PNG buffer to tmpfiles
     const form = new FormData();
-    form.append("file", pngBuffer, {
-      filename: "upload.png",
-      contentType: "image/png",
-    });
+    form.append("file", pngBuffer, { filename: "upload.png", contentType: "image/png" });
 
     const uploadResp = await fetch("https://tmpfiles.org/api/v1/upload", {
       method: "POST",
@@ -267,7 +267,25 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
 
     const imageUrl = rawUrl.includes("/dl/") ? rawUrl : rawUrl.replace("tmpfiles.org/", "tmpfiles.org/dl/");
 
-    // 2) Create Replicate prediction with a valid version hash
+    // 1.5) Sanity check that the URL is publicly fetchable as an image
+    async function headIsImage(u, tries = 3) {
+      for (let i = 0; i < tries; i++) {
+        try {
+          const h = await fetch(u, { method: "HEAD" });
+          const type = h.headers.get("content-type") || "";
+          if (h.ok && type.startsWith("image/")) return true;
+        } catch {}
+        await new Promise(r => setTimeout(r, 350));
+      }
+      return false;
+    }
+    const okHead = await headIsImage(imageUrl);
+    if (!okHead) {
+      return res.status(502).json({ error: "Uploaded image URL is not publicly accessible as image/* yet. Please retry." });
+    }
+
+    // 2) Create Replicate prediction (note: this version may still reinterpret inputs)
+    // For exact fidelity, we should switch to a ControlNet (Canny) img2img model.
     const REPLICATE_VERSION = "54a0e1e1841cbb8c4ef226bd5e197798bef44acd0f63ed38338bda222205a7b0";
 
     const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
@@ -279,8 +297,10 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       body: JSON.stringify({
         version: REPLICATE_VERSION,
         input: {
-          prompt,
+          // Send BOTH keys so we don't lose the image due to schema mismatch
+          image: imageUrl,
           input_images: [imageUrl],
+          prompt,
           openai_api_key: OPENAI_API_KEY,
           quality: "auto",
           background: "transparent",
@@ -289,6 +309,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
           number_of_images: 1,
           output_format: "png",
           output_compression: 90,
+          // image_guidance: 0.2, // uncomment if supported by the model to hew closer to the input
         },
       }),
     });
