@@ -228,7 +228,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     const isImageOnly = mode === "image";
 
     const prompt = isImageOnly
-      ? "Create a clean, high-contrast black and white line drawing of the boat shown in the input image. White background, no extra elements, no shadows, no artistic effects — just a clear outline and main details of the boat."
+      ? "Create a clean, high-contrast black and white line drawing of the boat shown in the input image. The entire background must be solid pure white. No extra elements, no shadows, no artistic effects — just a clear outline and main details of the boat."
 
       : "Create a clean, high-contrast black and white line drawing of the boat shown in the input image, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background, no extra elements, no shadows.";
 
@@ -578,4 +578,5 @@ app.post(
 // ---------- Start server ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
 
