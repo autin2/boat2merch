@@ -1,3 +1,4 @@
+// server.js
 import express from "express";
 import multer from "multer";
 import fetch from "node-fetch";
@@ -209,7 +210,7 @@ app.use((req, res, next) => {
   }
 });
 
-// ---------- Image generation ----------
+// ---------- Image generation (forces openai/gpt-image-1 on Replicate) ----------
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded (field name must be 'boatImage')." });
@@ -220,14 +221,14 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     const mode = (req.body?.mode || "sticker").toLowerCase();
     const isImageOnly = mode === "image";
 
-    // Force fidelity in wording
+    // Tight prompt to reduce hallucinations
     const prompt = isImageOnly
-      ? "Use the EXACT boat from the input image. Reproduce the same hull, proportions, windows and details. Output a clean black and white line drawing. Transparent background. Do NOT invent new elements, angles, or boats."
-      : "Use the EXACT boat from the input image. Reproduce the same hull, proportions, windows and details. Output a clean black and white line drawing with a THICK WHITE CONTOUR around the boat (die-cut look). Transparent background. Do NOT invent new elements, angles, or boats.";
+      ? "Use the EXACT boat from the input image. Reproduce the same hull, proportions, windows, and details. Output a clean black-and-white line drawing only. Transparent background. Do NOT invent new elements or boats."
+      : "Use the EXACT boat from the input image. Reproduce the same hull, proportions, windows, and details. Output a clean black-and-white line drawing with a THICK WHITE CONTOUR around the boat (die-cut look). Transparent background. Do NOT invent new elements or boats.";
 
     console.log(`[generate-image] mode=${mode} prompt=${prompt.slice(0,80)}…`);
 
-    // Accept jpg/png/webp; standardize to PNG, strip metadata, cap size
+    // Accept jpg/png/webp; normalize to PNG
     const allowed = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
     if (!allowed.has(req.file.mimetype)) {
       return res.status(415).json({ error: `Unsupported file type ${req.file.mimetype}. Use JPG/PNG/WebP.` });
@@ -235,9 +236,8 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
 
     let pngBuffer;
     try {
-      // Resize to a sane max while preserving detail; strip metadata & auto-orient
       pngBuffer = await sharp(req.file.buffer)
-        .rotate() // auto-orient using EXIF
+        .rotate() // auto-orient via EXIF
         .resize({ width: 1536, height: 1536, fit: "inside", withoutEnlargement: true })
         .png({ compressionLevel: 9 })
         .toBuffer();
@@ -245,10 +245,11 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       console.warn("sharp conversion failed, forwarding original buffer:", e?.message);
       pngBuffer = req.file.buffer;
     } finally {
-      req.file.buffer = null; // free memory
+      // free memory early
+      req.file.buffer = null;
     }
 
-    // 1) Upload PNG buffer to tmpfiles
+    // Upload to tmpfiles
     const form = new FormData();
     form.append("file", pngBuffer, { filename: "upload.png", contentType: "image/png" });
 
@@ -269,7 +270,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
 
     const imageUrl = rawUrl.includes("/dl/") ? rawUrl : rawUrl.replace("tmpfiles.org/", "tmpfiles.org/dl/");
 
-    // 1.5) Sanity check that the URL is publicly fetchable as an image
+    // HEAD check to ensure it’s fetchable as image/*
     async function headIsImage(u, tries = 3) {
       for (let i = 0; i < tries; i++) {
         try {
@@ -286,43 +287,40 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       return res.status(502).json({ error: "Uploaded image URL is not publicly accessible as image/* yet. Please retry." });
     }
 
-    // 2) Create Replicate prediction (note: this version may still reinterpret inputs)
-    // For exact fidelity, we should switch to a ControlNet (Canny) img2img model.
-    const REPLICATE_VERSION = "54a0e1e1841cbb8c4ef226bd5e197798bef44acd0f63ed38338bda222205a7b0";
-
-    const replicateResp = await fetch("https://api.replicate.com/v1/predictions", {
+    // Create Replicate prediction pointing to OpenAI gpt-image-1 (NOT Flux)
+    const createResp = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
         Authorization: `Token ${REPLICATE_API_TOKEN}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        version: REPLICATE_VERSION,
+        model: "openai/gpt-image-1",
         input: {
-          // Send BOTH keys so we don't lose the image due to schema mismatch
-          image: imageUrl,
+          // Provide image via URL; wrapper usually supports input_images
           input_images: [imageUrl],
+          // Keep 'image' too for compatibility with some wrappers
+          image: imageUrl,
           prompt,
+          background: "transparent",
           openai_api_key: OPENAI_API_KEY,
           quality: "auto",
-          background: "transparent",
-          moderation: "auto",
           aspect_ratio: "1:1",
+          moderation: "auto",
           number_of_images: 1,
           output_format: "png",
-          output_compression: 90,
-          // image_guidance: 0.2, // uncomment if supported by the model to hew closer to the input
-        },
-      }),
+          output_compression: 90
+        }
+      })
     });
 
-    const text = await replicateResp.text();
+    const text = await createResp.text();
     let replicateData;
     try { replicateData = JSON.parse(text); } catch { replicateData = null; }
 
-    if (!replicateResp.ok) {
+    if (!createResp.ok) {
       return res.status(502).json({
-        error: `Replicate error ${replicateResp.status}`,
+        error: `Replicate error ${createResp.status}`,
         details: replicateData || text?.slice(0, 800) || "No body",
       });
     }
@@ -334,6 +332,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       });
     }
 
+    // Respond same shape as before so your polling stays intact
     res.json({ prediction: { id: replicateData.id } });
   } catch (error) {
     console.error("❌ Image generation error:", error);
