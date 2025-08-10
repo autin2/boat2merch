@@ -11,42 +11,122 @@
   <style>
     /* --- Page-scoped enhancements only --- */
 
-    .plans-grid {
+    .plans-grid{
       display:grid; grid-template-columns: repeat(3, 1fr); gap:18px;
     }
     @media (max-width: 900px){ .plans-grid{ grid-template-columns:1fr; } }
 
-    /* Allow ribbon to extend past card edges without clipping */
-    .plan.card.pad { position:relative; overflow: visible; }
+    /* Let ribbon & glow render outside card */
+    .plan.card.pad{ position:relative; overflow:visible; isolation:isolate; }
 
-    .plan .badge {
-      position:absolute; top:12px; right:-18px; transform: rotate(35deg);
-      background:#ff9800; color:#121212; font-weight:700; font-size:.8rem; letter-spacing:.5px;
-      padding:6px 56px; box-shadow:0 8px 20px rgba(0,0,0,.25);
-      border:1px solid #ffb347; z-index: 2; pointer-events:none;
+    /* Card polish + hover lift */
+    .plan{
+      transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+      box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    }
+    .plan:hover{
+      transform: translateY(-6px);
+      box-shadow: 0 14px 36px rgba(0,0,0,.35);
     }
 
-    .price {
-      font-size: 2.2em;
-      margin: 10px 0 4px;
-      color: #ff9800;
+    /* Featured card: subtle gradient ring + glow */
+    .plan.featured{
+      position:relative;
+      border:2px solid transparent;
+      background:
+        linear-gradient(#1b1b1b,#1b1b1b) padding-box,
+        linear-gradient(135deg,#ffb347 0%,#ff9800 35%,#ffd28a 70%,#ff9800 100%) border-box;
+      box-shadow:
+        0 0 0 1px rgba(255,152,0,.18) inset,
+        0 12px 30px rgba(255,152,0,.14);
     }
-    .price small { font-size:.55em; color:#cfcfcf; }
+    .plan.featured:hover{
+      box-shadow:
+        0 0 0 1px rgba(255,152,0,.22) inset,
+        0 16px 40px rgba(255,152,0,.22);
+    }
 
-    .plan ul { text-align:left; margin-top:12px; }
-    .plan ul li::marker { content: "✓ "; color:#4caf50; }
+    /* Ribbon (badge) — fixed tails, no clipping, crisp text */
+    .plan .badge{
+      --r: 34deg;
+      position:absolute;
+      top:18px;
+      right:-28px;
+      transform: rotate(var(--r));
+      transform-origin: center;
+      background: linear-gradient(180deg,#ffc66a 0%, #ff9800 60%, #f78e00 100%);
+      color:#121212;
+      font-weight:800;
+      font-size:.82rem;
+      letter-spacing:.6px;
+      padding:8px 64px;
+      border:1px solid #ffcf85;
+      text-shadow: 0 1px 0 rgba(255,255,255,.25);
+      filter: drop-shadow(0 8px 18px rgba(0,0,0,.35));
+      z-index:3;
+      pointer-events:none;
+    }
+    .plan .badge::before,
+    .plan .badge::after{
+      content:"";
+      position:absolute;
+      top:100%;
+      width:0; height:0;
+      border-top:10px solid #cc7800;
+      border-left:10px solid transparent;
+      border-right:10px solid transparent;
+      filter:brightness(.9);
+    }
+    .plan .badge::before{ left:16px; transform:skewX(-18deg); }
+    .plan .badge::after{ right:16px; transform:skewX(18deg); }
 
-    .compare {
+    /* Price: gradient text */
+    .price{
+      font-size:2.2em; margin:10px 0 4px;
+      background: linear-gradient(180deg,#ffd28a 0%, #ff9800 60%, #ff7a00 100%);
+      -webkit-background-clip:text; background-clip:text; color:transparent;
+    }
+    .price small{ font-size:.55em; color:#cfcfcf; }
+
+    .plan ul{ text-align:left; margin-top:12px; }
+    .plan ul li::marker{ content:"✓ "; color:#4caf50; }
+
+    .compare{
       display:grid; grid-template-columns: 1.3fr repeat(3, 1fr);
       gap:12px; align-items:center;
     }
-    .compare .head { font-weight:700; }
+    .compare .head{ font-weight:700; }
 
-    .faq-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:18px; }
+    .faq-grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap:18px; }
     @media (max-width: 900px){ .faq-grid{ grid-template-columns:1fr; } }
 
-    .tick { color:#4caf50; font-weight:700; }
-    .cross { color:#b75; font-weight:700; }
+    .tick{ color:#4caf50; font-weight:700; }
+    .cross{ color:#b75; font-weight:700; }
+
+    /* CTA button sheen (subtle) */
+    .btn-primary{
+      position:relative; overflow:hidden;
+    }
+    .btn-primary::after{
+      content:"";
+      position:absolute; inset:0 -120%;
+      transform:skewX(-18deg) translateX(-60%);
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.18) 45%, rgba(255,255,255,.06) 60%, transparent 100%);
+      transition: transform .6s ease;
+    }
+    .btn-primary:hover::after{ transform:skewX(-18deg) translateX(0%); }
+
+    /* Optional: gentle sparkle near featured card */
+    .plan.featured::before{
+      content:"";
+      position:absolute; inset:-6px;
+      background:
+        radial-gradient(8px 8px at 20% 30%, rgba(255,152,0,.12), transparent 60%),
+        radial-gradient(6px 6px at 80% 20%, rgba(255,220,160,.14), transparent 60%),
+        radial-gradient(7px 7px at 70% 75%, rgba(255,152,0,.08), transparent 60%),
+        radial-gradient(5px 5px at 30% 80%, rgba(255,200,120,.10), transparent 60%);
+      pointer-events:none; border-radius:12px; z-index:0;
+    }
   </style>
 </head>
 <body>
