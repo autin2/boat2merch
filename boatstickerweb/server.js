@@ -210,7 +210,7 @@ app.use((req, res, next) => {
   }
 });
 
-// ---------- Image generation (forces openai/gpt-image-1 on Replicate) ----------
+// ---------- Image generation (Replicate -> OpenAI gpt-image-1, no tmpfiles) ----------
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded (field name must be 'boatImage')." });
@@ -249,43 +249,8 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       req.file.buffer = null;
     }
 
-    // Upload to tmpfiles
-    const form = new FormData();
-    form.append("file", pngBuffer, { filename: "upload.png", contentType: "image/png" });
-
-    const uploadResp = await fetch("https://tmpfiles.org/api/v1/upload", {
-      method: "POST",
-      body: form,
-      headers: form.getHeaders(),
-    });
-
-    if (!uploadResp.ok) {
-      const txt = await uploadResp.text().catch(() => "");
-      return res.status(502).json({ error: `tmpfiles upload failed: ${uploadResp.status}`, details: txt.slice(0, 500) });
-    }
-
-    const uploadData = await uploadResp.json().catch(() => null);
-    const rawUrl = uploadData?.data?.url;
-    if (!rawUrl) return res.status(500).json({ error: "No URL returned from tmpfiles" });
-
-    const imageUrl = rawUrl.includes("/dl/") ? rawUrl : rawUrl.replace("tmpfiles.org/", "tmpfiles.org/dl/");
-
-    // HEAD check to ensure it’s fetchable as image/*
-    async function headIsImage(u, tries = 3) {
-      for (let i = 0; i < tries; i++) {
-        try {
-          const h = await fetch(u, { method: "HEAD" });
-          const type = h.headers.get("content-type") || "";
-          if (h.ok && type.startsWith("image/")) return true;
-        } catch {}
-        await new Promise(r => setTimeout(r, 350));
-      }
-      return false;
-    }
-    const okHead = await headIsImage(imageUrl);
-    if (!okHead) {
-      return res.status(502).json({ error: "Uploaded image URL is not publicly accessible as image/* yet. Please retry." });
-    }
+    // Build data URL (avoid tmp host and HEAD flakiness)
+    const dataUrl = `data:image/png;base64,${pngBuffer.toString("base64")}`;
 
     // Create Replicate prediction pointing to OpenAI gpt-image-1 (NOT Flux)
     const createResp = await fetch("https://api.replicate.com/v1/predictions", {
@@ -297,10 +262,9 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       body: JSON.stringify({
         model: "openai/gpt-image-1",
         input: {
-          // Provide image via URL; wrapper usually supports input_images
-          input_images: [imageUrl],
-          // Keep 'image' too for compatibility with some wrappers
-          image: imageUrl,
+          input_images: [dataUrl],
+          // keep 'image' too for wrapper compat
+          image: dataUrl,
           prompt,
           background: "transparent",
           openai_api_key: OPENAI_API_KEY,
