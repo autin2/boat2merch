@@ -10,31 +10,20 @@
   <link rel="stylesheet" href="style.css" />
   <style>
     /* --- Page-scoped enhancements only --- */
-    .price-toggle {
-      display:flex; align-items:center; justify-content:center; gap:10px;
-      margin: 0 auto 18px;
-    }
-    .toggle {
-      position: relative; width: 56px; height: 28px; background:#2a2a2a; border:1px solid #3a3a3a;
-      border-radius: 999px; cursor: pointer;
-    }
-    .toggle .knob {
-      position:absolute; top:2px; left:2px; width:24px; height:24px; border-radius:50%;
-      background:#ff9800; transition:left .18s ease;
-    }
-    .toggle.on .knob { left: 30px; }
 
     .plans-grid {
       display:grid; grid-template-columns: repeat(3, 1fr); gap:18px;
     }
     @media (max-width: 900px){ .plans-grid{ grid-template-columns:1fr; } }
 
-    .plan.card.pad { position:relative; overflow:hidden; }
+    /* Allow ribbon to extend past card edges without clipping */
+    .plan.card.pad { position:relative; overflow: visible; }
+
     .plan .badge {
-      position:absolute; top:12px; right:-24px; transform: rotate(35deg);
-      background:#ff9800; color:#121212; font-weight:700; font-size:.8rem;
-      padding:6px 40px; box-shadow:0 8px 20px rgba(0,0,0,.25);
-      border:1px solid #ffb347;
+      position:absolute; top:12px; right:-18px; transform: rotate(35deg);
+      background:#ff9800; color:#121212; font-weight:700; font-size:.8rem; letter-spacing:.5px;
+      padding:6px 56px; box-shadow:0 8px 20px rgba(0,0,0,.25);
+      border:1px solid #ffb347; z-index: 2; pointer-events:none;
     }
 
     .price {
@@ -43,10 +32,6 @@
       color: #ff9800;
     }
     .price small { font-size:.55em; color:#cfcfcf; }
-    .save-pill {
-      display:inline-block; margin-left:8px; padding:2px 8px; border-radius:999px;
-      background:#2a2a2a; border:1px solid #3a3a3a; color:#ffda9e; font-size:.75rem;
-    }
 
     .plan ul { text-align:left; margin-top:12px; }
     .plan ul li::marker { content: "✓ "; color:#4caf50; }
@@ -56,10 +41,7 @@
       gap:12px; align-items:center;
     }
     .compare .head { font-weight:700; }
-    .chip {
-      display:inline-block; padding:4px 10px; border-radius:999px;
-      background:#2a2a2a; border:1px solid #3a3a3a; color:#ddd; font-size:.85rem;
-    }
+
     .faq-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:18px; }
     @media (max-width: 900px){ .faq-grid{ grid-template-columns:1fr; } }
 
@@ -90,15 +72,6 @@
     <div class="container">
       <h1>Pricing</h1>
       <p class="muted">Simple, flexible plans. No hidden fees.</p>
-
-      <!-- Toggle -->
-      <div class="price-toggle" role="group" aria-label="Billing period">
-        <span class="muted">Monthly</span>
-        <div id="billingToggle" class="toggle" tabindex="0" role="switch" aria-checked="false" aria-label="Switch to yearly billing">
-          <div class="knob"></div>
-        </div>
-        <span class="muted">Yearly <span class="save-pill">Save ~20%</span></span>
-      </div>
     </div>
   </section>
 
@@ -108,10 +81,7 @@
       <!-- Free -->
       <div class="plan card pad" aria-label="Free plan">
         <h2>Free</h2>
-        <p class="price">
-          <span class="amount" data-monthly="0" data-yearly="0">$0</span>
-          <small class="per">/ <span class="period">month</span></small>
-        </p>
+        <p class="price">$0 <small>/ month</small></p>
         <ul>
           <li>1 AI-generated boat design</li>
           <li>Low-resolution preview</li>
@@ -124,10 +94,7 @@
       <div class="plan featured card pad" aria-label="Pro plan">
         <div class="badge">MOST POPULAR</div>
         <h2>Pro</h2>
-        <p class="price">
-          <span class="amount" data-monthly="19" data-yearly="15">$19</span>
-          <small class="per">/ <span class="period">month</span></small>
-        </p>
+        <p class="price">$19 <small>/ month</small></p>
         <ul>
           <li>5 AI-generated designs / mo</li>
           <li>High-resolution files</li>
@@ -140,10 +107,7 @@
       <!-- Unlimited -->
       <div class="plan card pad" aria-label="Unlimited plan">
         <h2>Unlimited</h2>
-        <p class="price">
-          <span class="amount" data-monthly="49" data-yearly="39">$49</span>
-          <small class="per">/ <span class="period">month</span></small>
-        </p>
+        <p class="price">$49 <small>/ month</small></p>
         <ul>
           <li>Unlimited designs</li>
           <li>High-resolution files</li>
@@ -206,7 +170,7 @@
     </div>
   </section>
 
-  <!-- FAQ -->
+  <!-- FAQ (2 items only) -->
   <section>
     <div class="container faq-grid">
       <div class="card pad">
@@ -216,14 +180,6 @@
       <div class="card pad">
         <h3 style="margin-top:0;">Do I keep commercial rights?</h3>
         <p class="muted">Free is preview-only. Pro and Unlimited include full print rights for your generated art.</p>
-      </div>
-      <div class="card pad">
-        <h3 style="margin-top:0;">What image types can I upload?</h3>
-        <p class="muted">Most common formats (JPG/PNG/WebP). Higher resolution photos produce cleaner edges.</p>
-      </div>
-      <div class="card pad">
-        <h3 style="margin-top:0;">How fast is generation?</h3>
-        <p class="muted">Usually under two minutes. You’ll see live status during processing.</p>
       </div>
     </div>
   </section>
@@ -244,31 +200,5 @@
     </div>
   </footer>
 
-  <script>
-    // Monthly ↔ Yearly toggle
-    const toggle = document.getElementById('billingToggle');
-    const amounts = document.querySelectorAll('.amount');
-    const periods = document.querySelectorAll('.period');
-
-    function setBilling(yearly) {
-      amounts.forEach(span => {
-        const m = span.getAttribute('data-monthly');
-        const y = span.getAttribute('data-yearly');
-        const val = yearly ? y : m;
-        span.textContent = (val === "0") ? "$0" : `$${val}`;
-      });
-      periods.forEach(p => p.textContent = yearly ? 'year' : 'month');
-      toggle.classList.toggle('on', yearly);
-      toggle.setAttribute('aria-checked', yearly ? 'true' : 'false');
-      toggle.setAttribute('aria-label', yearly ? 'Switch to monthly billing' : 'Switch to yearly billing');
-    }
-
-    let yearly = false;
-    setBilling(yearly);
-
-    function flip() { yearly = !yearly; setBilling(yearly); }
-    toggle.addEventListener('click', flip);
-    toggle.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
-  </script>
 </body>
 </html>
