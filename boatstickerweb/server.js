@@ -210,8 +210,9 @@ app.use((req, res, next) => {
   }
 });
 
-// ---------- Image generation (Replicate -> OpenAI gpt-image-1, no tmpfiles) ----------
+// ---------- Image generation (Replicate -> OpenAI gpt-image-1, with fallback) ----------
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
+  const t0 = Date.now();
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded (field name must be 'boatImage')." });
     if (!REPLICATE_API_TOKEN || !OPENAI_API_KEY) {
@@ -221,83 +222,123 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     const mode = (req.body?.mode || "sticker").toLowerCase();
     const isImageOnly = mode === "image";
 
-    // Tight prompt to reduce hallucinations
     const prompt = isImageOnly
       ? "Use the EXACT boat from the input image. Reproduce the same hull, proportions, windows, and details. Output a clean black-and-white line drawing only. Transparent background. Do NOT invent new elements or boats."
       : "Use the EXACT boat from the input image. Reproduce the same hull, proportions, windows, and details. Output a clean black-and-white line drawing with a THICK WHITE CONTOUR around the boat (die-cut look). Transparent background. Do NOT invent new elements or boats.";
 
-    console.log(`[generate-image] mode=${mode} prompt=${prompt.slice(0,80)}…`);
-
-    // Accept jpg/png/webp; normalize to PNG
-    const allowed = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
-    if (!allowed.has(req.file.mimetype)) {
-      return res.status(415).json({ error: `Unsupported file type ${req.file.mimetype}. Use JPG/PNG/WebP.` });
-    }
-
+    // Normalize to PNG and keep payload modest
     let pngBuffer;
     try {
       pngBuffer = await sharp(req.file.buffer)
-        .rotate() // auto-orient via EXIF
-        .resize({ width: 1536, height: 1536, fit: "inside", withoutEnlargement: true })
+        .rotate()
+        .resize({ width: 1024, height: 1024, fit: "inside", withoutEnlargement: true })
         .png({ compressionLevel: 9 })
         .toBuffer();
     } catch (e) {
       console.warn("sharp conversion failed, forwarding original buffer:", e?.message);
       pngBuffer = req.file.buffer;
     } finally {
-      // free memory early
-      req.file.buffer = null;
+      req.file.buffer = null; // free memory
     }
 
-    // Build data URL (avoid tmp host and HEAD flakiness)
+    const kb = Math.round(pngBuffer.byteLength / 1024);
+    console.log(`[generate-image] mode=${mode} input ~${kb}KB`);
+
+    // First try: data URL (simplest)
     const dataUrl = `data:image/png;base64,${pngBuffer.toString("base64")}`;
 
-    // Create Replicate prediction pointing to OpenAI gpt-image-1 (NOT Flux)
-    const createResp = await fetch("https://api.replicate.com/v1/predictions", {
-      method: "POST",
-      headers: {
-        Authorization: `Token ${REPLICATE_API_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-image-1",
-        input: {
-          input_images: [dataUrl],
-          // keep 'image' too for wrapper compat
-          image: dataUrl,
-          prompt,
-          background: "transparent",
-          openai_api_key: OPENAI_API_KEY,
-          quality: "auto",
-          aspect_ratio: "1:1",
-          moderation: "auto",
-          number_of_images: 1,
-          output_format: "png",
-          output_compression: 90
+    const makePrediction = async (imageRef) => {
+      const createResp = await fetch("https://api.replicate.com/v1/predictions", {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${REPLICATE_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-image-1",
+          input: {
+            input_images: [imageRef],
+            image: imageRef, // compatibility
+            prompt,
+            background: "transparent",
+            openai_api_key: OPENAI_API_KEY,
+            quality: "auto",
+            aspect_ratio: "1:1",
+            moderation: "auto",
+            number_of_images: 1,
+            output_format: "png",
+            output_compression: 90
+          }
+        })
+      });
+
+      const raw = await createResp.text();
+      let payload = null;
+      try { payload = JSON.parse(raw); } catch {}
+
+      if (!createResp.ok) {
+        const msg = payload?.error || payload?.detail || raw?.slice(0, 1200) || "Unknown Replicate error";
+        const code = createResp.status;
+        return { ok: false, code, payload: msg };
+      }
+      if (!payload?.id) {
+        return { ok: false, code: 500, payload: payload || "No prediction id" };
+      }
+      return { ok: true, id: payload.id };
+    };
+
+    // Try data URL
+    let pred = await makePrediction(dataUrl);
+
+    // If data URL fails (size/content), fall back to tmpfiles URL
+    if (!pred.ok) {
+      const errText = String(pred.payload || "");
+      const shouldFallback =
+        pred.code >= 400 &&
+        (
+          errText.includes("data URL") ||
+          errText.includes("base64") ||
+          errText.includes("Too Large") ||
+          errText.includes("payload") ||
+          errText.includes("unsupported") ||
+          errText.includes("input_images")
+        );
+
+      if (shouldFallback) {
+        console.warn("[generate-image] data URL rejected, falling back to tmpfiles…");
+
+        // Upload to tmpfiles
+        const form = new FormData();
+        form.append("file", pngBuffer, { filename: "upload.png", contentType: "image/png" });
+
+        const uploadResp = await fetch("https://tmpfiles.org/api/v1/upload", {
+          method: "POST",
+          body: form,
+          headers: form.getHeaders(),
+        });
+
+        if (!uploadResp.ok) {
+          const txt = await uploadResp.text().catch(() => "");
+          return res.status(502).json({ error: `tmpfiles upload failed: ${uploadResp.status}`, details: txt.slice(0, 800) });
         }
-      })
-    });
 
-    const text = await createResp.text();
-    let replicateData;
-    try { replicateData = JSON.parse(text); } catch { replicateData = null; }
+        const uploadData = await uploadResp.json().catch(() => null);
+        const rawUrl = uploadData?.data?.url;
+        if (!rawUrl) return res.status(500).json({ error: "No URL returned from tmpfiles" });
 
-    if (!createResp.ok) {
-      return res.status(502).json({
-        error: `Replicate error ${createResp.status}`,
-        details: replicateData || text?.slice(0, 800) || "No body",
-      });
+        const imageUrl = rawUrl.includes("/dl/") ? rawUrl : rawUrl.replace("tmpfiles.org/", "tmpfiles.org/dl/");
+
+        pred = await makePrediction(imageUrl);
+      }
     }
 
-    if (!replicateData?.id) {
-      return res.status(500).json({
-        error: "No prediction ID returned from Replicate",
-        details: replicateData || text?.slice(0, 800),
-      });
+    if (!pred.ok) {
+      console.error("Replicate create error:", pred.code, pred.payload);
+      return res.status(502).json({ error: `Replicate error ${pred.code}`, details: pred.payload });
     }
 
-    // Respond same shape as before so your polling stays intact
-    res.json({ prediction: { id: replicateData.id } });
+    console.log(`[generate-image] created prediction ${pred.id} in ${Date.now()-t0}ms`);
+    res.json({ prediction: { id: pred.id } });
   } catch (error) {
     console.error("❌ Image generation error:", error);
     res.status(500).json({ error: error?.message || "Failed to generate image" });
@@ -323,7 +364,6 @@ app.get("/prediction-status/:id", async (req, res) => {
       });
     }
 
-    // Client checks: statusData.status + statusData.output?.length
     res.json(statusData);
   } catch (error) {
     console.error("❌ Prediction status error:", error);
@@ -376,9 +416,9 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     Items: [
       {
         Quantity: 1,
-        SKU: sku,                    // validated country-enabled catalog SKU
+        SKU: sku,
         ShipType: "standard",
-        Images: [{ Url: imageUrl }], // dynamic art
+        Images: [{ Url: imageUrl }],
         SourceId: safeId,
       },
     ],
