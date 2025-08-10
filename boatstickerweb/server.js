@@ -225,12 +225,15 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     }
 
     const mode = (req.body?.mode || "sticker").toLowerCase();
-    const isImageOnly = mode === "image";
+    const isSticker = mode === "sticker";
 
-    const prompt = isImageOnly
-      ? "Create a clean, high-contrast black and white line drawing of the boat shown in the input image. The entire background must be solid pure white. No extra elements, no shadows, no artistic effects — just a clear outline and main details of the boat."
+    // Prompts per mode
+    const prompt = isSticker
+      ? "Create a clean, high-contrast black and white line drawing of the boat shown in the input image, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background, no extra elements, no shadows."
+      : "Create a clean, high-contrast black and white line drawing of the boat shown in the input image. The entire background must be solid pure white. No extra elements, no shadows, no artistic effects — just a clear outline and main details of the boat.";
 
-      : "Create a clean, high-contrast black and white line drawing of the boat shown in the input image, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background, no extra elements, no shadows.";
+    // Background control per mode (this is what actually enforces the white vs transparent)
+    const backgroundSetting = isSticker ? "transparent" : "white";
 
     // Normalize to PNG and keep payload modest
     let pngBuffer;
@@ -268,7 +271,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
             // Keep 'image' for compatibility with some wrappers
             image: imageRef,
             prompt,
-            background: "transparent",
+            background: backgroundSetting, // <-- enforce white vs transparent per mode
             openai_api_key: OPENAI_API_KEY,
             quality: "auto",
             aspect_ratio: "1:1",
@@ -424,9 +427,9 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     Items: [
       {
         Quantity: 1,
-        SKU: sku,
+        SKU: sku,                    // validated country-enabled catalog SKU
         ShipType: "standard",
-        Images: [{ Url: imageUrl }],
+        Images: [{ Url: imageUrl }], // dynamic art
         SourceId: safeId,
       },
     ],
@@ -578,5 +581,3 @@ app.post(
 // ---------- Start server ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
-
-
