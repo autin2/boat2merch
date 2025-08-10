@@ -249,28 +249,28 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
 
     const makePrediction = async (imageRef) => {
       const createResp = await fetch("https://api.replicate.com/v1/predictions", {
-        method: "POST",
-        headers: {
-          Authorization: `Token ${REPLICATE_API_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "openai/gpt-image-1",
-          input: {
-            input_images: [imageRef],
-            image: imageRef, // compatibility
-            prompt,
-            background: "transparent",
-            openai_api_key: OPENAI_API_KEY,
-            quality: "auto",
-            aspect_ratio: "1:1",
-            moderation: "auto",
-            number_of_images: 1,
-            output_format: "png",
-            output_compression: 90
-          }
-        })
-      });
+  method: "POST",
+  headers: {
+    Authorization: `Token ${REPLICATE_API_TOKEN}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    version: "54a0e1e1841cbb8c4ef226bd5e197798bef44acd0f63ed38338bda222205a7b0", // gpt-image-1 version
+    input: {
+      prompt,
+      input_images: [imageRef],
+      background: "transparent",
+      openai_api_key: OPENAI_API_KEY,
+      quality: "auto",
+      aspect_ratio: "1:1",
+      moderation: "auto",
+      number_of_images: 1,
+      output_format: "png",
+      output_compression: 90
+    }
+  })
+});
+
 
       const raw = await createResp.text();
       let payload = null;
@@ -570,3 +570,4 @@ app.post(
 // ---------- Start server ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
