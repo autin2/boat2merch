@@ -228,8 +228,9 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     const isImageOnly = mode === "image";
 
     const prompt = isImageOnly
-      ? "Use the EXACT boat from the input image. Reproduce the same hull, proportions, windows, and details. Output a clean black-and-white line drawing only. Transparent background. Do NOT invent new elements or boats."
-      : "Use the EXACT boat from the input image. Reproduce the same hull, proportions, windows, and details. Output a clean black-and-white line drawing with a THICK WHITE CONTOUR around the boat (die-cut look). Transparent background. Do NOT invent new elements or boats.";
+      ? "Create a clean, high-contrast black and white line drawing of the boat shown in the input image. White background, no extra elements, no shadows, no artistic effects — just a clear outline and main details of the boat."
+
+      : "Create a clean, high-contrast black and white line drawing of the boat shown in the input image, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background, no extra elements, no shadows.";
 
     // Normalize to PNG and keep payload modest
     let pngBuffer;
@@ -577,3 +578,4 @@ app.post(
 // ---------- Start server ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
