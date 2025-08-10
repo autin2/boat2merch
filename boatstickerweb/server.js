@@ -225,6 +225,8 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       ? "Use the EXACT boat from the input image. Reproduce the same hull, proportions, windows and details. Output a clean black and white line drawing. Transparent background. Do NOT invent new elements, angles, or boats."
       : "Use the EXACT boat from the input image. Reproduce the same hull, proportions, windows and details. Output a clean black and white line drawing with a THICK WHITE CONTOUR around the boat (die-cut look). Transparent background. Do NOT invent new elements, angles, or boats.";
 
+    console.log(`[generate-image] mode=${mode} prompt=${prompt.slice(0,80)}…`);
+
     // Accept jpg/png/webp; standardize to PNG, strip metadata, cap size
     const allowed = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
     if (!allowed.has(req.file.mimetype)) {
@@ -411,9 +413,9 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     Items: [
       {
         Quantity: 1,
-        SKU: sku,
+        SKU: sku,                    // validated country-enabled catalog SKU
         ShipType: "standard",
-        Images: [{ Url: imageUrl }],
+        Images: [{ Url: imageUrl }], // dynamic art
         SourceId: safeId,
       },
     ],
