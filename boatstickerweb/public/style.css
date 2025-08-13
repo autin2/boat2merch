@@ -530,26 +530,52 @@ section .card.pad {
   .btn, .card, nav.topnav a::after { transition: none; }
 }
 
-/* ==== AUTH MODAL ==== */
-#authModal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.5);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
+/* --- Account pill + small buttons --- */
+.account-slot { display:flex; align-items:center; gap:10px; }
+.btn.small { padding:8px 12px; border-radius:8px; font-size:.9rem; }
+.btn.tiny { padding:6px 10px; border-radius:8px; font-size:.8rem; }
+.signed-in-pill { display:flex; align-items:center; gap:8px; background:#202020; border:1px solid #2e2e2e; border-radius:999px; padding:6px 10px; }
+.hidden { display:none !important; }
+
+/* --- Result gate (blur overlay until signed in) --- */
+.result-wrap { position: relative; }
+.gate {
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  backdrop-filter: blur(3px);
+  background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.5));
+  border-radius: 10px;
 }
-#authModal .modal-content {
-  background: #fff;
-  color: #000;
-  padding: 20px;
-  border-radius: 8px;
-  width: 300px;
-  text-align: center;
+.gate-box {
+  background:#161616; border:1px solid #2a2a2a; border-radius:12px; padding:18px 16px; text-align:center;
+  box-shadow: 0 10px 24px rgba(0,0,0,.35);
+  width:min(90%, 420px);
 }
-#authModal input {
-  width: 100%;
-  padding: 8px;
-  margin: 8px 0;
+.gate-box h3 { margin:0 0 6px; }
+
+/* --- Auth modal --- */
+.auth-modal {
+  position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+  background: rgba(0,0,0,.55); z-index: 1000;
 }
+.auth-modal.hidden { display:none; }
+.auth-card {
+  width:min(92vw, 440px);
+  background:#1b1b1b; border:1px solid #2c2c2c; border-radius:14px; padding:20px;
+  box-shadow: 0 12px 36px rgba(0,0,0,.4);
+  position: relative;
+}
+.auth-close {
+  position:absolute; top:10px; right:10px; border:none; background:transparent; color:#aaa; font-size:22px; cursor:pointer;
+}
+#authForm { display:flex; gap:10px; }
+#authForm input[type="email"] {
+  flex:1; background:#2a2a2a; border:1px solid #3a3a3a; color:#eaeaea; padding:10px 12px; border-radius:8px;
+}
+.sr-only { position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+
+/* --- Toast --- */
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: 22px; background: #222; color: #fff; padding: 10px 14px;
+  border: 1px solid #333; border-radius: 10px; z-index:
+
