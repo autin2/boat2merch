@@ -14,7 +14,7 @@
   <style>
     /* Local tweaks so buttons sit nicely under the text */
     .hero .lead-wrap { max-width: 560px; }
-    .hero .controls { justify-content: center; margin-top: 14px; }
+    .hero .controls { justify-content: flex-start; margin-top: 14px; margin-left: 4px; }
     .hero #statusArea { margin-top: 12px; }
   </style>
 </head>
@@ -33,6 +33,15 @@
         <a href="examples.html">Examples</a>
         <a href="contact.html">Contact</a>
       </nav>
+
+      <!-- Account pill (shows “Sign in” or the user’s email) -->
+      <div class="account-slot">
+        <button id="signinBtn" class="btn btn-ghost small">Sign in</button>
+        <div id="userPill" class="signed-in-pill hidden">
+          <span id="userEmail"></span>
+          <button id="signoutBtn" class="btn btn-ghost tiny">Sign out</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -58,12 +67,23 @@
         <div id="statusArea" aria-live="polite"></div>
 
         <!-- Result -->
-        <div id="resultPanel" class="card pad" style="margin-top:12px; display:none;">
+        <div id="resultPanel" class="card pad" style="margin-top:12px; display:none; position: relative;">
           <p class="muted" style="margin:0 0 8px;">Your AI-generated output:</p>
-          <img id="resultImage" class="result-img" alt="AI generated boat drawing" />
+          <div class="result-wrap">
+            <img id="resultImage" class="result-img" alt="AI generated boat drawing" />
+            <!-- Sign-in gate overlay (only shown when not signed in) -->
+            <div id="gate" class="gate hidden" role="dialog" aria-label="Sign in required">
+              <div class="gate-box">
+                <h3>Sign in to view & download</h3>
+                <p class="muted">We’ll email you a secure link — no password needed.</p>
+                <button id="gateSignIn" class="btn btn-primary">Continue</button>
+                <small class="muted">No spam. One-click sign in.</small>
+              </div>
+            </div>
+          </div>
           <div class="btn-row">
-            <a id="downloadBtn" class="btn btn-ghost" download="boat-ai-design.png">Download</a>
-            <button id="buyBtn" class="btn btn-secondary">Buy as a sticker</button>
+            <a id="downloadBtn" class="btn btn-ghost" download="boat-ai-design.png" aria-disabled="true">Download</a>
+            <button id="buyBtn" class="btn btn-secondary" aria-disabled="true">Buy as a sticker</button>
           </div>
         </div>
       </div>
@@ -118,6 +138,24 @@
     </div>
   </footer>
 
+  <!-- Sign-in Modal (magic-link) -->
+  <div id="authModal" class="auth-modal hidden" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="auth-card">
+      <button class="auth-close" id="authClose" aria-label="Close">×</button>
+      <h2 id="authTitle" style="margin:0 0 8px;">Sign in</h2>
+      <p class="muted" style="margin:0 0 14px;">We’ll email you a secure link. No password needed.</p>
+      <form id="authForm">
+        <label for="authEmail" class="sr-only">Email</label>
+        <input type="email" id="authEmail" placeholder="you@example.com" required />
+        <button type="submit" class="btn btn-primary" id="authSubmit">Send magic link</button>
+      </form>
+      <div id="authNote" class="muted tiny" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- Tiny toast -->
+  <div id="toast" class="toast hidden"></div>
+
   <!-- Scripts -->
   <script>
     const boatUpload = document.getElementById("boatUpload");
@@ -129,10 +167,118 @@
     const resultImage = document.getElementById("resultImage");
     const downloadBtn = document.getElementById("downloadBtn");
     const buyBtn = document.getElementById("buyBtn");
+    const gate = document.getElementById("gate");
+    const gateSignIn = document.getElementById("gateSignIn");
+
+    // Auth widgets
+    const signinBtn = document.getElementById("signinBtn");
+    const userPill = document.getElementById("userPill");
+    const userEmailEl = document.getElementById("userEmail");
+    const signoutBtn = document.getElementById("signoutBtn");
+
+    const authModal = document.getElementById("authModal");
+    const authClose = document.getElementById("authClose");
+    const authForm = document.getElementById("authForm");
+    const authEmail = document.getElementById("authEmail");
+    const authSubmit = document.getElementById("authSubmit");
+    const authNote = document.getElementById("authNote");
+    const toast = document.getElementById("toast");
 
     let currentMode = "image"; // "image" | "sticker"
+    let isAuthed = false;
 
-    // Button handlers set mode and open file dialog
+    // --------------- helpers ---------------
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.remove("hidden");
+      setTimeout(() => toast.classList.add("hidden"), 2600);
+    }
+    function openAuth() {
+      authModal.classList.remove("hidden");
+      setTimeout(() => authEmail.focus(), 0);
+    }
+    function closeAuth() {
+      authModal.classList.add("hidden");
+      authForm.reset();
+      authNote.textContent = "";
+    }
+    async function fetchJSON(url, opts) {
+      const r = await fetch(url, opts);
+      const t = await r.text();
+      try { return { ok: r.ok, json: JSON.parse(t) }; }
+      catch { return { ok: r.ok, json: t }; }
+    }
+    function setAuthedState(email) {
+      isAuthed = !!email;
+      if (isAuthed) {
+        signinBtn.classList.add("hidden");
+        userPill.classList.remove("hidden");
+        userEmailEl.textContent = email;
+        gate.classList.add("hidden");
+        downloadBtn.removeAttribute("aria-disabled");
+        buyBtn.removeAttribute("aria-disabled");
+      } else {
+        signinBtn.classList.remove("hidden");
+        userPill.classList.add("hidden");
+        userEmailEl.textContent = "";
+      }
+    }
+
+    async function checkSession() {
+      try {
+        const { ok, json } = await fetchJSON("/auth/session");
+        if (ok && json && json.user && json.user.email) {
+          setAuthedState(json.user.email);
+        } else {
+          setAuthedState(null);
+        }
+      } catch {
+        // If session endpoint doesn't exist yet, just hide the UI but keep app usable
+        signinBtn.classList.add("hidden");
+        userPill.classList.add("hidden");
+      }
+    }
+
+    // --------------- Auth UI wiring ---------------
+    signinBtn?.addEventListener("click", openAuth);
+    gateSignIn?.addEventListener("click", openAuth);
+    authClose?.addEventListener("click", closeAuth);
+    authModal?.addEventListener("click", (e) => { if (e.target === authModal) closeAuth(); });
+
+    authForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = authEmail.value.trim();
+      if (!email) return;
+
+      authSubmit.disabled = true;
+      authSubmit.textContent = "Sending…";
+      authNote.textContent = "";
+
+      const { ok, json } = await fetchJSON("/auth/send-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+
+      authSubmit.disabled = false;
+      authSubmit.textContent = "Send magic link";
+
+      if (ok) {
+        authNote.textContent = "Check your email for the sign-in link.";
+      } else {
+        authNote.textContent = (json && json.error) ? json.error : "Could not send link right now.";
+      }
+    });
+
+    signoutBtn?.addEventListener("click", async () => {
+      const { ok } = await fetchJSON("/auth/signout", { method: "POST" });
+      if (ok) {
+        setAuthedState(null);
+        showToast("Signed out");
+      }
+    });
+
+    // --------------- Generate buttons ---------------
     btnImage.addEventListener("click", () => { currentMode = "image"; boatUpload.click(); });
     btnSticker.addEventListener("click", () => { currentMode = "sticker"; boatUpload.click(); });
 
@@ -153,7 +299,7 @@
       const file = boatUpload.files[0];
       const formData = new FormData();
       formData.append("boatImage", file);
-      formData.append("mode", currentMode); // BACKEND will switch prompts based on this
+      formData.append("mode", currentMode);
 
       try {
         const uploadResp = await fetch("/generate-image", { method: "POST", body: formData });
@@ -178,12 +324,27 @@
             // Update UI
             statusArea.innerHTML = "";
             resultImage.src = imageUrl;
-            downloadBtn.href = imageUrl;
             resultPanel.style.display = "block";
 
-            // Buttons: both go to buy
+            // Gate: if not signed in, blur + disable actions
+            if (!isAuthed) {
+              gate.classList.remove("hidden");
+              downloadBtn.setAttribute("aria-disabled", "true");
+              buyBtn.setAttribute("aria-disabled", "true");
+              downloadBtn.removeAttribute("href");
+            } else {
+              gate.classList.add("hidden");
+              downloadBtn.href = imageUrl;
+              downloadBtn.removeAttribute("aria-disabled");
+              buyBtn.removeAttribute("aria-disabled");
+            }
+
+            // CTA buttons
             editBtn.classList.add("visible");
-            const goBuy = () => window.location.href = "buy.html?img=" + encodeURIComponent(imageUrl);
+            const goBuy = () => {
+              if (!isAuthed) { openAuth(); return; }
+              window.location.href = "buy.html?img=" + encodeURIComponent(imageUrl);
+            };
             editBtn.onclick = goBuy;
             buyBtn.onclick = goBuy;
 
@@ -206,6 +367,19 @@
         boatUpload.value = "";
       }
     });
+
+    // Kick off session check on load
+    checkSession();
+
+    // If you redirect back after magic link verify with ?login=ok
+    if (new URLSearchParams(location.search).get("login") === "ok") {
+      showToast("You're signed in!");
+      // Clean the URL
+      const url = new URL(location.href);
+      url.searchParams.delete("login");
+      history.replaceState({}, "", url);
+      checkSession();
+    }
   </script>
 </body>
 </html>
