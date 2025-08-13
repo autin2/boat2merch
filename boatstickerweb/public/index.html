@@ -11,13 +11,18 @@
   <!-- Favicon / App Icon -->
   <link rel="icon" type="image/png" sizes="32x32" href="/images/icon.png?v=3">
   <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Local tweaks so buttons sit nicely under the text */
+    .hero .lead-wrap { max-width: 560px; }
+    .hero .controls { justify-content: center; margin-top: 14px; }
+    .hero #statusArea { margin-top: 12px; }
+  </style>
 </head>
 <body>
   <!-- Header -->
   <header class="site-header">
     <div class="container nav-row">
       <div class="brand">
-        <!-- Replaced emoji with your icon -->
         <img src="/images/icon.png" class="logo-img" alt="" width="24" height="24" />
         <span>Boat2Merch</span>
       </div>
@@ -34,33 +39,31 @@
   <!-- Hero -->
   <section class="hero">
     <div class="container hero-inner">
-      <!-- Left: copy + controls -->
-      <div>
+      <!-- Left: copy + controls (buttons moved directly under text) -->
+      <div class="lead-wrap">
         <h1 class="headline">Turn your boat photo into a clean, die-cut sticker — instantly.</h1>
         <p class="subhead">Upload a photo. Our AI returns a crisp line-art with an optional white contour, ready for stickers, shirts, and more.</p>
 
-        <!-- Action area (transparent) -->
-        <div class="action-card" role="region" aria-label="Upload and settings">
-          <!-- Hidden system file input -->
-          <input type="file" id="boatUpload" accept="image/*" style="display:none" />
+        <!-- Hidden system file input -->
+        <input type="file" id="boatUpload" accept="image/*" style="display:none" />
 
-          <div class="controls">
-            <button class="btn btn-primary" id="btnImage">Generate an Image</button>
-            <button class="btn btn-secondary" id="btnSticker">Generate a Sticker</button>
-            <button class="btn btn-ghost" id="editBtn">Buy as a sticker</button>
-          </div>
+        <!-- Buttons now live directly under the text -->
+        <div class="controls">
+          <button class="btn btn-primary" id="btnImage">Generate an Image</button>
+          <button class="btn btn-secondary" id="btnSticker">Generate a Sticker</button>
+          <button class="btn btn-ghost" id="editBtn">Buy as a sticker</button>
+        </div>
 
-          <!-- Status -->
-          <div id="statusArea" style="margin-top:12px;" aria-live="polite"></div>
+        <!-- Status -->
+        <div id="statusArea" aria-live="polite"></div>
 
-          <!-- Result (kept as a card for clarity) -->
-          <div id="resultPanel" class="card pad" style="margin-top:12px; display:none;">
-            <p class="muted" style="margin:0 0 8px;">Your AI-generated output:</p>
-            <img id="resultImage" class="result-img" alt="AI generated boat drawing" />
-            <div class="btn-row">
-              <a id="downloadBtn" class="btn btn-ghost" download="boat-ai-design.png">Download</a>
-              <button id="buyBtn" class="btn btn-secondary">Buy as a sticker</button>
-            </div>
+        <!-- Result -->
+        <div id="resultPanel" class="card pad" style="margin-top:12px; display:none;">
+          <p class="muted" style="margin:0 0 8px;">Your AI-generated output:</p>
+          <img id="resultImage" class="result-img" alt="AI generated boat drawing" />
+          <div class="btn-row">
+            <a id="downloadBtn" class="btn btn-ghost" download="boat-ai-design.png">Download</a>
+            <button id="buyBtn" class="btn btn-secondary">Buy as a sticker</button>
           </div>
         </div>
       </div>
@@ -200,13 +203,9 @@
         console.error(err);
         statusArea.innerHTML = `<div class="card pad" style="border-color:#733;">Error: ${err.message}</div>`;
       } finally {
-        // clear the input so selecting the same file again re-triggers change
         boatUpload.value = "";
       }
     });
   </script>
 </body>
 </html>
-
-
-
