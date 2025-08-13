@@ -16,16 +16,18 @@
       --cardMax: 300px;
       --imgH: 210px;
       --speed: 48s; /* base speed */
-      --slowSpeed: 96s; /* hover slowdown */
       --glow: 0 0 12px rgba(255,152,0,.45), 0 0 22px rgba(255,152,0,.25);
     }
+
     .examples-wrap .card.pad { overflow: hidden; }
+
     .marquee {
       position: relative;
       overflow: hidden;
       mask-image: linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%);
       -webkit-mask-image: linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%);
     }
+
     .rail {
       display: inline-flex;
       align-items: stretch;
@@ -34,13 +36,13 @@
       width: max-content;
       animation: scroll var(--speed) linear infinite;
     }
-    .marquee:hover .rail {
-      animation-duration: var(--slowSpeed);
-    }
+
+    /* Move by 50% of total width because we duplicate the strip */
     @keyframes scroll {
       from { transform: translateX(0); }
       to   { transform: translateX(calc(-50% - var(--gap)/2)); }
     }
+
     .ex-item {
       flex: 0 0 clamp(var(--cardMin), 24vw, var(--cardMax));
       background: #171717;
@@ -55,6 +57,7 @@
       0%,100% { transform: translateY(0) rotate(0deg); }
       50%     { transform: translateY(-3px) rotate(-.6deg); }
     }
+
     .ex-item img {
       display: block;
       width: 100%;
@@ -76,6 +79,7 @@
       width: 8px; height: 8px; border-radius: 50%;
       background: #ff9800; box-shadow: 0 0 10px rgba(255,152,0,.7);
     }
+
     @media (prefers-reduced-motion: reduce) {
       .rail { animation: none; }
       .ex-item { animation: none; }
@@ -88,6 +92,7 @@
 </head>
 <body>
 
+  <!-- Header -->
   <header class="site-header">
     <div class="container nav-row">
       <div class="brand">
@@ -104,6 +109,7 @@
     </div>
   </header>
 
+  <!-- Page Header -->
   <section class="page-header">
     <div class="container">
       <h1>Examples</h1>
@@ -111,18 +117,19 @@
     </div>
   </section>
 
+  <!-- Continuous Marquee Carousel -->
   <section class="examples-wrap">
     <div class="container">
       <div class="card pad">
-        <div class="marquee" aria-label="Example gallery (auto-scrolling)">
-          <div class="rail" id="examplesRail">
-            <!-- Images populated by JS -->
-          </div>
+        <div class="marquee" aria-label="Example gallery (auto-scrolling)" id="marquee">
+          <div class="rail" id="railA"></div>
+          <!-- railB will be a clone for seamless loop -->
         </div>
       </div>
     </div>
   </section>
 
+  <!-- CTA -->
   <section class="cta">
     <div class="container">
       <h2 style="margin:0 0 10px;">Make yours next</h2>
@@ -131,6 +138,7 @@
     </div>
   </section>
 
+  <!-- Footer -->
   <footer>
     <div class="container">
       <p>&copy; 2025 Boat2Merch · All rights reserved.</p>
@@ -138,31 +146,62 @@
   </footer>
 
   <script>
-    // Manually list or fetch from backend if you have file listing API
-    const allImages = [
-      "example1.png","example2.png","example3.png","example4.png",
-      "example5.png","example6.png","example7.png","example8.png",
-      "example9.png","example10.png","sportfishing-boat-32.png","icon.png"
-    ];
-    const skipFiles = ["icon.png","sportfishing-boat-32.png"];
-    const filtered = allImages.filter(img => !skipFiles.includes(img));
-
-    const rail = document.getElementById("examplesRail");
-    function makeFigure(src) {
-      const fig = document.createElement("figure");
-      fig.className = "ex-item";
-      const img = document.createElement("img");
-      img.src = `/src/public/images/${src}`;
-      img.alt = src;
-      const cap = document.createElement("figcaption");
-      cap.className = "ex-caption";
-      cap.textContent = src.replace(/\.[^/.]+$/, "").replace(/[-_]/g," ");
+    // Build figures
+    function makeFigure(url) {
+      const base = url.split('/').pop();
+      const fig = document.createElement('figure');
+      fig.className = 'ex-item';
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = base.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+      const cap = document.createElement('figcaption');
+      cap.className = 'ex-caption';
+      cap.textContent = img.alt || 'Example';
       fig.appendChild(img);
       fig.appendChild(cap);
       return fig;
     }
-    // Duplicate strip for seamless loop
-    [...filtered, ...filtered].forEach(file => rail.appendChild(makeFigure(file)));
+
+    async function init() {
+      try {
+        // Get list from server
+        const res = await fetch('/images/list');
+        if (!res.ok) throw new Error('Failed to fetch image list');
+        let files = await res.json(); // array of URLs like "/images/xxx.png"
+
+        // Exclude icons/favicons; keep top-to-bottom
+        const skip = new Set(['/images/icon.png', '/images/sportfishing-boat-32.png']);
+        files = files.filter(u => !skip.has(u.toLowerCase()));
+
+        // Fill first rail
+        const railA = document.getElementById('railA');
+        files.forEach(u => railA.appendChild(makeFigure(u)));
+
+        // Duplicate strip for seamless loop
+        const railB = railA.cloneNode(true);
+        railB.id = 'railB';
+        railA.parentElement.appendChild(railB);
+
+        // Smooth slowdown on hover without resetting keyframe:
+        // Change playbackRate via Web Animations API.
+        const marquee = document.getElementById('marquee');
+
+        function setPlaybackRate(rate) {
+          const anims = marquee.getAnimations({ subtree: true });
+          for (const a of anims) a.playbackRate = rate;
+        }
+
+        marquee.addEventListener('mouseenter', () => setPlaybackRate(0.4)); // slow but don’t pause
+        marquee.addEventListener('mouseleave', () => setPlaybackRate(1));
+
+        // Ensure animations exist before adjusting playbackRate (Safari quirk)
+        requestAnimationFrame(() => setPlaybackRate(1));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    init();
   </script>
 </body>
 </html>
