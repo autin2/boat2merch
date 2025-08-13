@@ -18,10 +18,10 @@ const { Pool } = pkg;
 const {
   DATABASE_URL,
 
-  // App/session
+  // App + sessions
   APP_ORIGIN,
-  SESSION_COOKIE_NAME,
-  SESSION_SECRET,
+  SESSION_COOKIE_NAME = "sid",
+  SESSION_SECRET = "",
 
   // Image gen
   REPLICATE_API_TOKEN,
@@ -46,7 +46,9 @@ const {
   GOOTEN_STICKER_SKU,
 } = process.env;
 
-// ---------- DB setup ----------
+const isProd = process.env.NODE_ENV === "production";
+
+// Create a pool if DATABASE_URL is present (Render env)
 let pool = null;
 let q = async () => { throw new Error("Database is not configured"); };
 if (DATABASE_URL) {
@@ -54,7 +56,6 @@ if (DATABASE_URL) {
   q = (text, params) => pool.query(text, params);
   (async function runBootMigration() {
     const sql = `
-    -- Enable a UUID generator. Try uuid-ossp; if not available, fall back to pgcrypto.
     DO $$
     BEGIN
       BEGIN
@@ -69,14 +70,12 @@ if (DATABASE_URL) {
       END;
     END$$;
 
-    -- Users (email-only accounts)
     CREATE TABLE IF NOT EXISTS users (
       id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
       email TEXT UNIQUE NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now()
     );
 
-    -- Sessions (remember me)
     CREATE TABLE IF NOT EXISTS sessions (
       id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
       user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -84,7 +83,6 @@ if (DATABASE_URL) {
       expires_at timestamptz NOT NULL
     );
 
-    -- Magic-link tokens
     CREATE TABLE IF NOT EXISTS login_tokens (
       id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
       user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -94,7 +92,6 @@ if (DATABASE_URL) {
       used BOOLEAN NOT NULL DEFAULT false
     );
 
-    -- Plan state (free/pro)
     CREATE TABLE IF NOT EXISTS subscriptions (
       id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
       user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -106,7 +103,6 @@ if (DATABASE_URL) {
       updated_at timestamptz NOT NULL DEFAULT now()
     );
 
-    -- Successful reveal/download logs
     CREATE TABLE IF NOT EXISTS generations (
       id bigserial PRIMARY KEY,
       user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -128,14 +124,14 @@ if (DATABASE_URL) {
 }
 
 const app = express();
+app.set("trust proxy", 1); // secure cookies behind Render proxy
 
-// ---------- Multer (uploads) ----------
+// Memory storage + strict file size (keeps RAM controlled)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 12 * 1024 * 1024 }, // 12MB
 });
 
-// ---------- Stripe ----------
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
 // ---------- Static sticker config ----------
@@ -297,9 +293,9 @@ async function pickSkuForCountry({ preferredSku, countryCode }) {
 // ---------- Nodemailer ----------
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
-  port: parseInt(SMTP_PORT || "587", 10),
-  secure: (SMTP_PORT === "465"),
-  auth: SMTP_USER && SMTP_PASS ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
+  port: parseInt(SMTP_PORT, 10),
+  secure: SMTP_PORT === "465",
+  auth: { user: SMTP_USER, pass: SMTP_PASS },
 });
 
 // ---------- Static files ----------
@@ -307,207 +303,188 @@ app.use("/images", express.static(path.join(process.cwd(), "src/public/images"),
   maxAge: "7d",
 }));
 
-// Signed cookies
-app.use(cookieParser(SESSION_SECRET || "dev-secret"));
+// Cookies (signed if SESSION_SECRET provided)
+app.use(cookieParser(SESSION_SECRET || undefined));
 
-// ---------- JSON parsing (skip raw for Stripe webhook) ----------
+// ---------- Static + JSON parsing ----------
+app.use(express.static("public"));
 app.use((req, res, next) => {
   if (req.originalUrl === "/webhook") {
     next(); // Stripe webhook uses raw body parsing below
   } else {
-    express.json({ limit: "2mb" })(req, res, next);
+    express.json({ limit: "2mb" })(req, res, next); // keep JSON body small
   }
 });
 
-// Also serve ./public as static root (index.html, etc.)
-app.use(express.static("public"));
+/* ============================
+   AUTH: magic-link endpoints
+   ============================ */
 
-// ===== Auth helpers & middleware =====
-const COOKIE_NAME = SESSION_COOKIE_NAME || "sid";
-const ORIGIN = APP_ORIGIN || "http://localhost:3000";
-const SESSION_TTL_DAYS = 180;
+function hashToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
 
-function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate()+n); return x; }
-function hashToken(raw) { return crypto.createHash("sha256").update(raw).digest("hex"); }
+function newToken() {
+  // Node 20+: 'base64url' exists. Fallback to hex if not.
+  try { return crypto.randomBytes(32).toString("base64url"); }
+  catch { return crypto.randomBytes(32).toString("hex"); }
+}
 
-async function createSession(userId) {
-  const expires = addDays(new Date(), SESSION_TTL_DAYS);
+function cookieOptions(days = 90) {
+  return {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: isProd,          // true on Render
+    path: "/",
+    maxAge: days * 24 * 60 * 60 * 1000,
+    signed: !!SESSION_SECRET
+  };
+}
+
+async function createSession(res, userId) {
+  const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
   const { rows } = await q(
-    `insert into sessions (user_id, expires_at) values ($1,$2) returning id, expires_at`,
-    [userId, expires]
+    "INSERT INTO sessions (user_id, expires_at) VALUES ($1,$2) RETURNING id",
+    [userId, expiresAt]
   );
-  return rows[0];
+  const sid = rows[0].id;
+  res.cookie(SESSION_COOKIE_NAME, sid, cookieOptions(90));
+  return sid;
 }
 
-async function getSessionAndUser(sessionId) {
-  const { rows } = await q(`
-    select s.id as session_id, s.expires_at, u.id as user_id, u.email,
-           coalesce(sub.plan,'free') as plan, coalesce(sub.status,'inactive') as status
-    from sessions s
-    join users u on u.id = s.user_id
-    left join subscriptions sub on sub.user_id = u.id
-    where s.id = $1 and s.expires_at > now()
-    limit 1
-  `, [sessionId]);
-  return rows[0] || null;
+function getSessionIdFromReq(req) {
+  const signed = req.signedCookies?.[SESSION_COOKIE_NAME];
+  if (signed) return signed;
+  return req.cookies?.[SESSION_COOKIE_NAME];
 }
 
-// Attach req.user if cookie present
-app.use(async (req, res, next) => {
+app.post("/auth/send-link", async (req, res) => {
   try {
-    if (!pool) return next();
-    const sid = req.signedCookies?.[COOKIE_NAME];
-    if (!sid) return next();
-    const sess = await getSessionAndUser(sid);
-    if (!sess) return next();
-    req.user = { id: sess.user_id, email: sess.email, plan: sess.plan, subStatus: sess.status, sessionId: sess.session_id };
-    next();
-  } catch (e) {
-    console.error("session middleware error:", e);
-    next();
-  }
-});
-
-function requireAuth(req, res, next) {
-  if (!req.user) return res.status(401).json({ error: "Auth required" });
-  next();
-}
-
-// ===== Magic-link routes =====
-
-// Start login: send magic link
-app.post("/auth/start", express.json(), async (req, res) => {
-  try {
-    if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const email = String(req.body?.email || "").trim().toLowerCase();
-    if (!email || !email.includes("@")) return res.status(400).json({ error: "Valid email required" });
+    const emailRaw = (req.body?.email || "").trim().toLowerCase();
+    if (!emailRaw || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailRaw)) {
+      return res.status(400).json({ error: "Valid email required" });
+    }
+    if (!APP_ORIGIN) {
+      return res.status(500).json({ error: "APP_ORIGIN not configured" });
+    }
 
     // Upsert user
-    const u = await q(
-      `insert into users (email) values ($1)
-       on conflict (email) do update set email = excluded.email
-       returning id, email`,
-      [email]
-    );
-    const user = u.rows[0];
+    await q("INSERT INTO users (email) VALUES ($1) ON CONFLICT (email) DO NOTHING", [emailRaw]);
+    const u = await q("SELECT id FROM users WHERE email=$1", [emailRaw]);
+    const userId = u.rows[0].id;
 
-    // Issue one-time token (15 min)
-    const rawToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = hashToken(rawToken);
-    const expires = new Date(Date.now() + 15 * 60 * 1000);
+    // Create one-time token
+    const token = newToken();
+    const tokenHash = hashToken(token);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
 
     await q(
-      `insert into login_tokens (user_id, token_hash, expires_at) values ($1,$2,$3)`,
-      [user.id, tokenHash, expires]
+      "INSERT INTO login_tokens (user_id, token_hash, expires_at) VALUES ($1,$2,$3)",
+      [userId, tokenHash, expiresAt]
     );
 
-    const link = `${ORIGIN}/auth/callback?token=${encodeURIComponent(rawToken)}&uid=${encodeURIComponent(user.id)}`;
+    const verifyUrl = `${APP_ORIGIN.replace(/\/+$/,'')}/auth/verify?token=${encodeURIComponent(token)}`;
 
-    // Send mail
-    const emailHtml = `
-      <p>Hi!</p>
-      <p>Click to sign in to Boat2Merch:</p>
-      <p><a href="${link}" style="background:#ff9800;color:#121212;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:700;">Sign in</a></p>
-      <p>This link expires in 15 minutes.</p>
+    // Email
+    const html = `
+      <div style="font-family:Arial,sans-serif;color:#222">
+        <h2>Sign in to Boat2Merch</h2>
+        <p>Click the secure link below to sign in. This link expires in 15 minutes.</p>
+        <p><a href="${verifyUrl}" style="background:#ff9800;color:#121212;padding:10px 14px;border-radius:8px;text-decoration:none;display:inline-block">Sign in</a></p>
+        <p style="color:#666">If the button doesn't work, paste this URL into your browser:</p>
+        <p style="word-break:break-all;color:#555">${verifyUrl}</p>
+      </div>
     `;
-    if (SMTP_USER) {
-      await transporter.sendMail({
-        from: `"boat2merch" <${SMTP_USER}>`,
-        to: email,
-        subject: "Your Boat2Merch sign-in link",
-        html: emailHtml
-      });
-    }
-
-    // For dev convenience you can also return link; comment out in prod if you want
-    res.json({ ok: true, sent: true /* , link */ });
-  } catch (e) {
-    console.error("auth/start error:", e);
-    res.status(500).json({ error: "Failed to start login" });
-  }
-});
-
-// Magic-link callback: consume token, create session, set cookie, redirect
-app.get("/auth/callback", async (req, res) => {
-  try {
-    if (!pool) return res.status(500).send("DB not configured");
-    const raw = String(req.query.token || "");
-    const uid = String(req.query.uid || "");
-    if (!raw || !uid) return res.status(400).send("Missing token");
-
-    const h = hashToken(raw);
-    const { rows } = await q(
-      `select id, user_id, expires_at, used from login_tokens
-       where user_id = $1 and token_hash = $2
-       limit 1`,
-      [uid, h]
-    );
-    const tok = rows[0];
-    if (!tok) return res.status(400).send("Invalid link");
-    if (tok.used) return res.status(400).send("Link already used");
-    if (new Date(tok.expires_at) < new Date()) return res.status(400).send("Link expired");
-
-    // mark used
-    await q(`update login_tokens set used = true where id = $1`, [tok.id]);
-
-    // create session
-    const sess = await createSession(tok.user_id);
-
-    // set signed cookie
-    res.cookie(COOKIE_NAME, sess.id, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      signed: true,
-      expires: new Date(sess.expires_at)
+    await transporter.sendMail({
+      from: `"boat2merch" <${SMTP_USER}>`,
+      to: emailRaw,
+      subject: "Your sign-in link",
+      html
     });
 
-    // back home
-    res.redirect(ORIGIN);
-  } catch (e) {
-    console.error("auth/callback error:", e);
-    res.status(500).send("Login failed");
-  }
-});
-
-// Who am I
-app.get("/me", async (req, res) => {
-  if (!req.user) return res.json({ user: null });
-  res.json({ user: { id: req.user.id, email: req.user.email, plan: req.user.plan, status: req.user.subStatus } });
-});
-
-// Logout
-app.post("/logout", (req, res) => {
-  try {
-    if (req.user?.sessionId && pool) {
-      q(`delete from sessions where id = $1`, [req.user.sessionId]).catch(()=>{});
-    }
-  } finally {
-    res.clearCookie(COOKIE_NAME, { httpOnly:true, secure:true, sameSite:"lax", signed:true });
     res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ /auth/send-link error:", err);
+    res.status(500).json({ error: "Unable to send link" });
   }
 });
 
-// (Optional) Log a successful generation view/download for a signed-in user
-app.post("/log-generation", express.json(), async (req, res) => {
+app.get("/auth/verify", async (req, res) => {
   try {
-    if (!pool) return res.status(500).json({ error: "Database not configured" });
-    if (!req.user) return res.status(401).json({ error: "Auth required" });
-    const { externalId, mode } = req.body || {};
-    if (!externalId || !mode) return res.status(400).json({ error: "externalId and mode required" });
-    await q(
-      `insert into generations (user_id, mode, external_id) values ($1,$2,$3)
-       on conflict (user_id, external_id) do nothing`,
-      [req.user.id, mode, externalId]
+    const token = (req.query?.token || "").toString();
+    if (!token) return res.status(400).send("Missing token");
+
+    const tokenHash = hashToken(token);
+    const now = new Date();
+
+    const { rows } = await q(
+      `SELECT lt.id, lt.user_id
+       FROM login_tokens lt
+       WHERE lt.token_hash = $1
+         AND lt.used = false
+         AND lt.expires_at > $2
+       LIMIT 1`,
+      [tokenHash, now]
     );
-    res.json({ ok: true });
-  } catch (e) {
-    console.error("log-generation error:", e);
-    res.status(500).json({ error: "Failed to log" });
+    if (!rows.length) return res.status(400).send("Invalid or expired link");
+
+    const { user_id, id: tokenId } = rows[0];
+
+    // Mark token used
+    await q("UPDATE login_tokens SET used=true WHERE id=$1", [tokenId]);
+
+    // Create session
+    await createSession(res, user_id);
+
+    // Redirect back home with a tiny flag the front-end recognizes
+    const target = `${(APP_ORIGIN || "").replace(/\/+$/,'')}/index.html?login=ok`;
+    res.redirect(target);
+  } catch (err) {
+    console.error("❌ /auth/verify error:", err);
+    res.status(500).send("Auth failed");
   }
 });
 
-// ---------- Image generation (Replicate -> OpenAI gpt-image-1, with fallback) ----------
+app.get("/auth/session", async (req, res) => {
+  try {
+    const sid = getSessionIdFromReq(req);
+    if (!sid) return res.json({ user: null });
+
+    const now = new Date();
+    const { rows } = await q(
+      `SELECT u.email
+       FROM sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.id = $1 AND s.expires_at > $2
+       LIMIT 1`,
+      [sid, now]
+    );
+    if (!rows.length) return res.json({ user: null });
+    return res.json({ user: { email: rows[0].email } });
+  } catch (err) {
+    console.error("❌ /auth/session error:", err);
+    res.status(500).json({ user: null });
+  }
+});
+
+app.post("/auth/signout", async (req, res) => {
+  try {
+    const sid = getSessionIdFromReq(req);
+    if (sid) {
+      await q("DELETE FROM sessions WHERE id=$1", [sid]).catch(() => {});
+    }
+    res.clearCookie(SESSION_COOKIE_NAME, cookieOptions(0));
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ /auth/signout error:", err);
+    res.status(500).json({ ok: false });
+  }
+});
+
+/* ============================
+   IMAGE GENERATION
+   ============================ */
+
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   const t0 = Date.now();
   try {
@@ -519,17 +496,12 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     const mode = (req.body?.mode || "sticker").toLowerCase();
     const isSticker = mode === "sticker";
 
-    // Prompts per mode (explicitly avoid cropping; include margin)
     const prompt = isSticker
       ? "Create a clean, high-contrast black and white line drawing of the boat shown in the input image, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background. Include the entire boat with a small margin; do not crop or cut off any part. No extra elements, no shadows."
       : "Create a clean, high-contrast black and white line drawing of the boat shown in the input image. The background must be fully solid white. Include the entire boat with a small margin around it; do not crop or cut off any part. No extra elements, no shadows, no artistic effects — just a clear outline and main details of the boat.";
 
-    // Background control per mode (this enforces white vs transparent)
     const backgroundSetting = isSticker ? "transparent" : "opaque";
 
-    // ---------- Input preprocessing: pad canvas to avoid tight crops ----------
-    // Resize inside a reasonable max, then extend canvas ~12% on all sides.
-    // Sticker gets transparent pad; Image gets white pad.
     let img = sharp(req.file.buffer).rotate()
       .resize({ width: 1280, height: 1280, fit: "inside", withoutEnlargement: true });
 
@@ -548,7 +520,6 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     const kb = Math.round(pngBuffer.byteLength / 1024);
     console.log(`[generate-image] mode=${mode} input ~${kb}KB`);
 
-    // First try: data URL (simplest)
     const dataUrl = `data:image/png;base64,${pngBuffer.toString("base64")}`;
 
     const makePrediction = async (imageRef) => {
@@ -559,16 +530,14 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          // IMPORTANT: Replicate's OpenAI wrapper needs "version", not "model"
           version: GPT_IMAGE_VERSION,
           input: {
             input_images: [imageRef],
-            image: imageRef, // compatibility
+            image: imageRef,
             prompt,
-            background: backgroundSetting, // enforce white vs transparent per mode
+            background: backgroundSetting,
             openai_api_key: OPENAI_API_KEY,
             quality: "auto",
-            // aspect_ratio: (removed to avoid forced square cropping)
             input_fidelity: "high",
             moderation: "auto",
             number_of_images: 1,
@@ -593,10 +562,10 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       return { ok: true, id: payload.id };
     };
 
-    // Try data URL
+    // Try data URL first
     let pred = await makePrediction(dataUrl);
 
-    // If data URL fails (size/content), fall back to tmpfiles URL
+    // If data URL fails, fall back to tmpfiles
     if (!pred.ok) {
       const errText = String(pred.payload || "");
       const shouldFallback =
@@ -613,7 +582,6 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
       if (shouldFallback) {
         console.warn("[generate-image] data URL rejected, falling back to tmpfiles…");
 
-        // Upload to tmpfiles
         const form = new FormData();
         form.append("file", pngBuffer, { filename: "upload.png", contentType: "image/png" });
 
@@ -651,7 +619,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   }
 });
 
-// ---------- List images for the examples page ----------
+// List images for the examples page
 app.get("/images/list", async (req, res) => {
   try {
     const dir = path.join(process.cwd(), "src/public/images");
@@ -672,7 +640,7 @@ app.get("/images/list", async (req, res) => {
   }
 });
 
-// ---------- Poll prediction ----------
+// Poll prediction
 app.get("/prediction-status/:id", async (req, res) => {
   try {
     const predictionId = req.params.id;
@@ -698,7 +666,7 @@ app.get("/prediction-status/:id", async (req, res) => {
   }
 });
 
-// ---------- Debug: see what SKUs are enabled ----------
+// Debug: see what SKUs are enabled
 app.get("/debug/gooten-variants", async (req, res) => {
   try {
     const country = normalizeCountryCode(req.query.country || "US");
@@ -709,7 +677,7 @@ app.get("/debug/gooten-variants", async (req, res) => {
   }
 });
 
-// ---------- Gooten order helper ----------
+// Gooten order helper
 async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
   if (!GOOTEN_RECIPE_ID || !GOOTEN_PARTNER_BILLING_KEY) {
     throw new Error("Missing Gooten recipe/billing env vars.");
@@ -743,9 +711,9 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     Items: [
       {
         Quantity: 1,
-        SKU: sku,                    // validated country-enabled catalog SKU
+        SKU: sku,
         ShipType: "standard",
-        Images: [{ Url: imageUrl }], // dynamic art
+        Images: [{ Url: imageUrl }],
         SourceId: safeId,
       },
     ],
@@ -772,7 +740,7 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
   return resp.json();
 }
 
-// ---------- Stripe: Checkout Session ----------
+// Stripe: Checkout Session
 app.post("/create-checkout-session", async (req, res) => {
   try {
     const { email, imageUrl, name, address } = req.body;
@@ -800,7 +768,7 @@ app.post("/create-checkout-session", async (req, res) => {
         buyerName: name,
         buyerAddress: JSON.stringify(address),
       },
-      success_url: `${ORIGIN}/thank-you.html`,
+      success_url: `${(APP_ORIGIN || "").replace(/\/+$/,'')}/thank-you.html`,
       cancel_url: "https://boat2merch.com",
     });
 
@@ -811,7 +779,7 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// ---------- Stripe webhook -> Gooten order + email ----------
+// Stripe webhook -> Gooten order + email
 app.post(
   "/webhook",
   express.raw({ type: "application/json" }),
@@ -878,15 +846,13 @@ app.post(
           <p><strong>Sticker Image:</strong></p>
           <img src="${imageUrl}" alt="Purchased Sticker" style="max-width:300px; border:1px solid #ccc; border-radius:6px;" />
         `;
-        if (SMTP_USER) {
-          await transporter.sendMail({
-            from: `"boat2merch" <${SMTP_USER}>`,
-            to: "charliebrayton8@gmail.com",
-            subject: `New Sticker Order from ${buyerName}`,
-            html: emailHtml,
-          });
-          console.log("✅ Order email sent");
-        }
+        await transporter.sendMail({
+          from: `"boat2merch" <${SMTP_USER}>`,
+          to: "charliebrayton8@gmail.com",
+          subject: `New Sticker Order from ${buyerName}`,
+          html: emailHtml,
+        });
+        console.log("✅ Order email sent");
       } catch (mailErr) {
         console.error("❌ Error sending order email:", mailErr);
       }
