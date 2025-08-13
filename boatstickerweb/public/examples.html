@@ -7,7 +7,10 @@
   <meta name="keywords" content="boat sticker examples, boat line art, die-cut stickers, print ready" />
   <meta name="author" content="Boat2Merch" />
   <title>Examples - Boat2Merch</title>
+
+  <!-- Favicon -->
   <link rel="icon" type="image/png" sizes="32x32" href="/images/icon.png?v=3">
+
   <link rel="stylesheet" href="style.css" />
   <style>
     :root {
@@ -15,13 +18,13 @@
       --cardMin: 220px;
       --cardMax: 300px;
       --imgH: 210px;
-      --speed: 48s;       /* base speed */
-      --slowSpeed: 96s;   /* slower on hover */
+      --speed: 48s; /* base speed */
       --glow: 0 0 12px rgba(255,152,0,.45), 0 0 22px rgba(255,152,0,.25);
     }
 
     .examples-wrap .card.pad { overflow: hidden; }
 
+    /* Edge fade for premium loop */
     .marquee {
       position: relative;
       overflow: hidden;
@@ -29,6 +32,7 @@
       -webkit-mask-image: linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%);
     }
 
+    /* One rail, items duplicated in HTML for seamless loop */
     .rail {
       display: inline-flex;
       align-items: stretch;
@@ -36,13 +40,8 @@
       padding: 12px 8px;
       width: max-content;
       animation: scroll var(--speed) linear infinite;
-      animation-play-state: running;
     }
-
-    .marquee:hover .rail {
-      animation-duration: var(--slowSpeed);
-    }
-
+    /* Move by 50% of total width because we duplicated the strip */
     @keyframes scroll {
       from { transform: translateX(0); }
       to   { transform: translateX(calc(-50% - var(--gap)/2)); }
@@ -58,7 +57,6 @@
       transform-origin: center 70%;
       animation: bob 6s ease-in-out infinite;
     }
-
     @keyframes bob {
       0%,100% { transform: translateY(0) rotate(0deg); }
       50%     { transform: translateY(-3px) rotate(-.6deg); }
@@ -81,7 +79,6 @@
       align-items: center;
       gap: 8px;
     }
-
     .ex-caption::before {
       content: "";
       width: 8px; height: 8px; border-radius: 50%;
@@ -92,7 +89,6 @@
       .rail { animation: none; }
       .ex-item { animation: none; }
     }
-
     @media (max-width: 480px) {
       :root { --imgH: 230px; }
       .ex-item { flex-basis: 72vw; }
@@ -130,31 +126,17 @@
   <section class="examples-wrap">
     <div class="container">
       <div class="card pad">
-        <div class="marquee" aria-label="Example gallery (auto-scrolling)">
-          <div class="rail">
-            <!-- Strip A -->
-            <figure class="ex-item"><img src="/images/example1.png" alt="Line-art"><figcaption class="ex-caption">Line-art</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example2.png" alt="White Contour"><figcaption class="ex-caption">White Contour</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example3.png" alt="Simplified Shapes"><figcaption class="ex-caption">Simplified Shapes</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example4.png" alt="Minimal B/W"><figcaption class="ex-caption">Minimal B/W</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example5.png" alt="High Contrast"><figcaption class="ex-caption">High Contrast</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example6.png" alt="Die-cut Border"><figcaption class="ex-caption">Die-cut Border</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example7.png" alt="Crisp Edges"><figcaption class="ex-caption">Crisp Edges</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example8.png" alt="Transparent BG"><figcaption class="ex-caption">Transparent BG</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example9.png" alt="Dynamic Angle"><figcaption class="ex-caption">Dynamic Angle</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example10.png" alt="Fine Lines"><figcaption class="ex-caption">Fine Lines</figcaption></figure>
+        <div class="marquee" aria-label="Example gallery (auto-scrolling)" id="marquee">
+          <div class="rail" id="rail">
+            <!-- Strip A (ONLY your valid files; icon.png & overlay.png excluded) -->
+            <figure class="ex-item"><img src="/images/freeman-2022-boat-1.jpg" alt="Freeman 2022 boat 1"><figcaption class="ex-caption">Freeman 2022 — 1</figcaption></figure>
+            <figure class="ex-item"><img src="/images/freeman-2022-boat-2.jpg" alt="Freeman 2022 boat 2"><figcaption class="ex-caption">Freeman 2022 — 2</figcaption></figure>
+            <figure class="ex-item"><img src="/images/freeman-2022-boat-3.jpg" alt="Freeman 2022 boat 3"><figcaption class="ex-caption">Freeman 2022 — 3</figcaption></figure>
 
             <!-- Strip B (duplicate for seamless loop) -->
-            <figure class="ex-item"><img src="/images/example1.png" alt=""><figcaption class="ex-caption">Line-art</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example2.png" alt=""><figcaption class="ex-caption">White Contour</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example3.png" alt=""><figcaption class="ex-caption">Simplified Shapes</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example4.png" alt=""><figcaption class="ex-caption">Minimal B/W</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example5.png" alt=""><figcaption class="ex-caption">High Contrast</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example6.png" alt=""><figcaption class="ex-caption">Die-cut Border</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example7.png" alt=""><figcaption class="ex-caption">Crisp Edges</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example8.png" alt=""><figcaption class="ex-caption">Transparent BG</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example9.png" alt=""><figcaption class="ex-caption">Dynamic Angle</figcaption></figure>
-            <figure class="ex-item"><img src="/images/example10.png" alt=""><figcaption class="ex-caption">Fine Lines</figcaption></figure>
+            <figure class="ex-item"><img src="/images/freeman-2022-boat-1.jpg" alt=""><figcaption class="ex-caption">Freeman 2022 — 1</figcaption></figure>
+            <figure class="ex-item"><img src="/images/freeman-2022-boat-2.jpg" alt=""><figcaption class="ex-caption">Freeman 2022 — 2</figcaption></figure>
+            <figure class="ex-item"><img src="/images/freeman-2022-boat-3.jpg" alt=""><figcaption class="ex-caption">Freeman 2022 — 3</figcaption></figure>
           </div>
         </div>
       </div>
@@ -176,5 +158,20 @@
       <p>&copy; 2025 Boat2Merch · All rights reserved.</p>
     </div>
   </footer>
+
+  <!-- Smooth slowdown without restart -->
+  <script>
+    (function () {
+      const marquee = document.getElementById('marquee');
+      function setPlaybackRate(rate) {
+        const anims = marquee.getAnimations({ subtree: true });
+        for (const a of anims) a.playbackRate = rate;
+      }
+      // Ensure animations are recognized before adjusting (Safari quirk)
+      requestAnimationFrame(() => setPlaybackRate(1));
+      marquee.addEventListener('mouseenter', () => setPlaybackRate(0.4)); // slow, don't stop
+      marquee.addEventListener('mouseleave', () => setPlaybackRate(1));
+    })();
+  </script>
 </body>
 </html>
