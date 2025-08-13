@@ -8,121 +8,100 @@
   <meta name="author" content="Boat2Merch" />
   <title>Pricing - Boat2Merch</title>
   <link rel="stylesheet" href="style.css" />
+
   <style>
     /* --- Page-scoped enhancements --- */
-
     .plans-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 18px;
     }
-    @media (max-width: 900px) {
-      .plans-grid { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 900px) { .plans-grid { grid-template-columns: 1fr; } }
 
     .plan.card.pad { position: relative; overflow: visible; isolation: isolate; }
+    .plan { transition: transform .2s ease, box-shadow .2s ease; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+    .plan:hover { transform: translateY(-6px); box-shadow: 0 14px 36px rgba(0,0,0,.35); }
 
-    /* Card hover lift */
-    .plan {
-      transition: transform .25s ease, box-shadow .25s ease;
-      box-shadow: 0 8px 24px rgba(0,0,0,.25);
-    }
-    .plan:hover {
-      transform: translateY(-6px);
-      box-shadow: 0 14px 36px rgba(0,0,0,.35);
-    }
-
-    /* Featured plan pop */
+    /* Featured ($10) card with subtle gradient border */
     .plan.featured {
       border: 2px solid transparent;
       background:
         linear-gradient(#1b1b1b,#1b1b1b) padding-box,
-        linear-gradient(135deg,#ffb347 0%,#ff9800 35%,#ffd28a 70%,#ff9800 100%) border-box;
-      box-shadow: 0 0 0 1px rgba(255,152,0,.18) inset, 0 12px 30px rgba(255,152,0,.14);
-    }
-    .plan.featured:hover {
-      box-shadow: 0 0 0 1px rgba(255,152,0,.22) inset, 0 16px 40px rgba(255,152,0,.22);
+        linear-gradient(135deg,#ffb347 0%,#ff9800 40%,#ffd28a 65%,#ff9800 100%) border-box;
+      box-shadow: 0 0 0 1px rgba(255,152,0,.15) inset, 0 12px 30px rgba(255,152,0,.14);
     }
 
-    /* --- Ribbon fix: pointed ribbon --- */
-    .plan .badge::before,
-    .plan .badge::after { content: none !important; display: none !important; }
-
-    .plan .badge {
-      --angle: 34deg;
+    /* --- Wrap-around ribbon --- */
+    .ribbon {
+      --angle: 35deg;
       position: absolute;
       top: 18px;
       right: -34px;
       transform: rotate(var(--angle));
       z-index: 3;
       pointer-events: none;
-
-      padding: 9px 68px;
+    }
+    /* Front band */
+    .ribbon .band {
+      display: inline-block;
+      padding: 10px 72px;
       font-weight: 800;
       font-size: .82rem;
       letter-spacing: .6px;
       color: #121212;
       background: linear-gradient(180deg,#ffc86f 0%, #ff9800 60%, #f18800 100%);
-      box-shadow:
-        0 0 0 1px rgba(255,207,133,.95) inset,
-        0 10px 22px rgba(0,0,0,.35);
-
-      clip-path: polygon(7% 0%, 93% 0%, 100% 50%, 93% 100%, 7% 100%, 0% 50%);
       text-shadow: 0 1px 0 rgba(255,255,255,.25);
+      clip-path: polygon(7% 0%, 93% 0%, 100% 50%, 93% 100%, 7% 100%, 0% 50%);
+      box-shadow:
+        0 0 0 1px rgba(255,207,133,.9) inset,
+        0 10px 22px rgba(0,0,0,.35);
+      position: relative;
     }
-
-    .plan .badge::after {
+    /* Inner gloss */
+    .ribbon .band::after {
       content:"";
-      position:absolute;
-      inset: 2px 6px;
-      pointer-events:none;
+      position:absolute; inset: 2px 6px;
       background:
         linear-gradient(180deg, rgba(255,255,255,.18), transparent 35%),
         linear-gradient(0deg, rgba(0,0,0,.12), transparent 20%);
       clip-path: inherit;
-      z-index: -1;
     }
-
-    @supports not (clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%)) {
-      .plan .badge {
-        border-radius: 2px;
-        right: -48px;
-      }
+    /* Back wrap shadow (appears behind card corners) */
+    .ribbon::before {
+      content:"";
+      position:absolute;
+      inset: 12px -80px 12px -80px; /* extend behind */
+      background: radial-gradient(80% 60% at 50% 50%, rgba(0,0,0,.35), rgba(0,0,0,0) 70%);
+      transform: rotate(calc(var(--angle) * -1));
+      z-index: -1; /* behind the card due to isolation */
+      filter: blur(6px);
+      opacity:.6;
     }
+    /* Folded tails on edges */
+    .ribbon .tail-left,
+    .ribbon .tail-right {
+      position: absolute; top: 50%; width: 16px; height: 18px; transform: translateY(-50%);
+      background: linear-gradient(180deg,#e07f00,#b86200);
+      box-shadow: 0 2px 4px rgba(0,0,0,.3) inset;
+    }
+    .ribbon .tail-left  { left: -10px;  clip-path: polygon(100% 0, 0 50%, 100% 100%); }
+    .ribbon .tail-right { right: -10px;  clip-path: polygon(0 0, 100% 50%, 0 100%); }
 
     /* Price gradient text */
     .price {
       font-size: 2.2em;
       margin: 10px 0 4px;
       background: linear-gradient(180deg,#ffd28a 0%, #ff9800 60%, #ff7a00 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
+      -webkit-background-clip: text; background-clip: text; color: transparent;
     }
     .price small { font-size:.55em; color:#cfcfcf; }
 
     .plan ul { text-align:left; margin-top:12px; }
     .plan ul li::marker { content:"✓ "; color:#4caf50; }
 
-    .compare {
-      display: grid;
-      grid-template-columns: 1.3fr repeat(3, 1fr);
-      gap: 12px;
-      align-items: center;
-    }
-    .compare .head { font-weight:700; }
-
-    .faq-grid {
-      display:grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 18px;
-    }
-    @media (max-width: 900px) {
-      .faq-grid { grid-template-columns: 1fr; }
-    }
-
-    .tick { color:#4caf50; font-weight:700; }
-    .cross { color:#b75; font-weight:700; }
+    /* Simple FAQ grid */
+    .faq-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+    @media (max-width: 900px) { .faq-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -130,7 +109,8 @@
   <header class="site-header">
     <div class="container nav-row">
       <div class="brand">
-        <span class="logo-emoji">🚤</span> Boat2Merch
+        <img src="/images/icon.png" class="logo-img" alt="" width="24" height="24" />
+        <span>Boat2Merch</span>
       </div>
       <nav class="topnav" aria-label="Primary">
         <a href="index.html">Home</a>
@@ -151,79 +131,41 @@
 
   <section class="pricing">
     <div class="container plans-grid">
+
+      <!-- Free -->
       <div class="plan card pad">
         <h2>Free</h2>
         <p class="price">$0 <small>/ month</small></p>
         <ul>
-          <li>1 AI-generated boat design</li>
-          <li>Low-resolution preview</li>
-          <li class="muted">No print rights</li>
+          <li><strong>Limit:</strong> 3 sticker generations / month</li>
+          <li><strong>Limit:</strong> 3 photo (line-art) generations / month</li>
+          <li>Download preview</li>
+          <li class="muted">No commercial/print rights</li>
         </ul>
         <button class="btn-secondary" onclick="location.href='index.html'">Get Started</button>
       </div>
 
+      <!-- $10 / month (featured) -->
       <div class="plan featured card pad">
-        <div class="badge">MOST POPULAR</div>
+        <!-- Wrap-around ribbon -->
+        <div class="ribbon" aria-hidden="true">
+          <span class="tail-left"></span>
+          <span class="band">BEST VALUE</span>
+          <span class="tail-right"></span>
+        </div>
+
         <h2>Pro</h2>
-        <p class="price">$19 <small>/ month</small></p>
+        <p class="price">$10 <small>/ month</small></p>
         <ul>
-          <li>5 AI-generated designs / mo</li>
+          <li><strong>Unlimited</strong> sticker generations</li>
+          <li><strong>Unlimited</strong> photo (line-art) generations</li>
           <li>High-resolution files</li>
-          <li>Full print rights</li>
+          <li>Full commercial/print rights</li>
           <li>Priority support</li>
         </ul>
         <button class="btn-primary" onclick="location.href='index.html'">Upgrade Now</button>
       </div>
 
-      <div class="plan card pad">
-        <h2>Unlimited</h2>
-        <p class="price">$49 <small>/ month</small></p>
-        <ul>
-          <li>Unlimited designs</li>
-          <li>High-resolution files</li>
-          <li>Full print rights</li>
-          <li>Priority support</li>
-        </ul>
-        <button class="btn-secondary" onclick="location.href='index.html'">Go Unlimited</button>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <div class="container">
-      <div class="card pad">
-        <div class="compare">
-          <div class="head">Feature</div>
-          <div class="head">Free</div>
-          <div class="head">Pro</div>
-          <div class="head">Unlimited</div>
-
-          <div>AI designs/month</div>
-          <div>1</div>
-          <div>5</div>
-          <div>∞</div>
-
-          <div>High-res files</div>
-          <div class="cross">×</div>
-          <div class="tick">✓</div>
-          <div class="tick">✓</div>
-
-          <div>Print rights</div>
-          <div class="cross">×</div>
-          <div class="tick">✓</div>
-          <div class="tick">✓</div>
-
-          <div>Priority support</div>
-          <div class="cross">×</div>
-          <div class="tick">✓</div>
-          <div class="tick">✓</div>
-
-          <div>Sticker-ready outline</div>
-          <div class="tick">✓</div>
-          <div class="tick">✓</div>
-          <div class="tick">✓</div>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -232,7 +174,7 @@
       <div class="card pad">
         <h3 style="margin:0 0 8px;">All plans include</h3>
         <p class="muted" style="margin:0;">
-          Background removal, clean black-and-white line art, and optional white die-cut contour for stickers on a transparent background.
+          Background cleanup, black-and-white line art, and optional white die-cut contour for stickers (transparent background).
         </p>
       </div>
     </div>
@@ -242,11 +184,11 @@
     <div class="container faq-grid">
       <div class="card pad">
         <h3 style="margin-top:0;">Can I switch plans later?</h3>
-        <p class="muted">Yes. Upgrade or downgrade anytime; changes prorate to the next cycle.</p>
+        <p class="muted">Yes—upgrade/downgrade anytime. Changes apply on the next billing cycle.</p>
       </div>
       <div class="card pad">
         <h3 style="margin-top:0;">Do I keep commercial rights?</h3>
-        <p class="muted">Free is preview-only. Pro and Unlimited include full print rights for your generated art.</p>
+        <p class="muted">Free is preview-only. Pro includes full commercial/print rights for your generated art.</p>
       </div>
     </div>
   </section>
