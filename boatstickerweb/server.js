@@ -9,15 +9,12 @@ import sharp from "sharp"; // JPEG/WEBP -> PNG, resize, auto-orient
 import path from "path";
 import fs from "fs/promises";
 
-const app = express();
-
-// Memory storage + strict file size (keeps RAM controlled)
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 12 * 1024 * 1024 }, // 12MB
-});
+// ==== NEW: Postgres bootstrap (safe run-once migration) ====
+import pkg from "pg";
+const { Pool } = pkg;
 
 const {
+  DATABASE_URL,
   // Image gen
   REPLICATE_API_TOKEN,
   OPENAI_API_KEY,
@@ -40,6 +37,95 @@ const {
   // Optional override (validated against country; ignored if unavailable)
   GOOTEN_STICKER_SKU,
 } = process.env;
+
+// Create a pool if DATABASE_URL is present (Render env)
+let pool = null;
+let q = async () => { throw new Error("Database is not configured"); };
+if (DATABASE_URL) {
+  pool = new Pool({ connectionString: DATABASE_URL });
+  q = (text, params) => pool.query(text, params);
+  (async function runBootMigration() {
+    const sql = `
+    -- Enable a UUID generator. Try uuid-ossp; if not available, fall back to pgcrypto.
+    DO $$
+    BEGIN
+      BEGIN
+        CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+      EXCEPTION WHEN OTHERS THEN
+        CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+        IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname='uuid_generate_v4') THEN
+          CREATE OR REPLACE FUNCTION uuid_generate_v4() RETURNS uuid AS $$
+            SELECT gen_random_uuid();
+          $$ LANGUAGE SQL;
+        END IF;
+      END;
+    END$$;
+
+    -- Users (email-only accounts)
+    CREATE TABLE IF NOT EXISTS users (
+      id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+      email TEXT UNIQUE NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+
+    -- Sessions (remember me)
+    CREATE TABLE IF NOT EXISTS sessions (
+      id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      expires_at timestamptz NOT NULL
+    );
+
+    -- Magic-link tokens
+    CREATE TABLE IF NOT EXISTS login_tokens (
+      id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      expires_at timestamptz NOT NULL,
+      used BOOLEAN NOT NULL DEFAULT false
+    );
+
+    -- Plan state (free/pro)
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free','pro')),
+      status TEXT NOT NULL DEFAULT 'inactive',
+      stripe_customer_id TEXT UNIQUE,
+      stripe_subscription_id TEXT UNIQUE,
+      current_period_end timestamptz,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+
+    -- Successful reveal/download logs
+    CREATE TABLE IF NOT EXISTS generations (
+      id bigserial PRIMARY KEY,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      mode TEXT NOT NULL CHECK (mode IN ('image','sticker')),
+      external_id TEXT NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (user_id, external_id)
+    );
+    `;
+    try {
+      await q(sql);
+      console.log("✅ Database schema is ready");
+    } catch (e) {
+      console.error("❌ Migration error:", e);
+    }
+  })();
+} else {
+  console.warn("⚠️ DATABASE_URL not set — DB features will be disabled.");
+}
+
+const app = express();
+
+// Memory storage + strict file size (keeps RAM controlled)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 12 * 1024 * 1024 }, // 12MB
+});
 
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
@@ -207,12 +293,9 @@ const transporter = nodemailer.createTransport({
   auth: { user: SMTP_USER, pass: SMTP_PASS },
 });
 
-
 app.use("/images", express.static(path.join(process.cwd(), "src/public/images"), {
   maxAge: "7d",
 }));
-
-
 
 // ---------- Static + JSON parsing ----------
 app.use(express.static("public"));
@@ -388,8 +471,6 @@ app.get("/images/list", async (req, res) => {
     res.status(500).json({ error: "Failed to list images" });
   }
 });
-
-
 
 // ---------- Poll prediction ----------
 app.get("/prediction-status/:id", async (req, res) => {
@@ -616,6 +697,3 @@ app.post(
 // ---------- Start server ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
-
-
-
