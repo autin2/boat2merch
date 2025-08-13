@@ -18,6 +18,11 @@ const { Pool } = pkg;
 const {
   DATABASE_URL,
 
+  // App/session
+  APP_ORIGIN,
+  SESSION_COOKIE_NAME,
+  SESSION_SECRET,
+
   // Image gen
   REPLICATE_API_TOKEN,
   OPENAI_API_KEY,
@@ -39,18 +44,11 @@ const {
 
   // Optional override (validated against country; ignored if unavailable)
   GOOTEN_STICKER_SKU,
-
-  // Sessions / app
-  APP_ORIGIN = "http://localhost:3000",
-  SESSION_COOKIE_NAME = "sid",
-  SESSION_SECRET = "change-me",
 } = process.env;
 
-// Create a pool if DATABASE_URL is present (Render env)
+// ---------- DB setup ----------
 let pool = null;
-let q = async () => {
-  throw new Error("Database is not configured");
-};
+let q = async () => { throw new Error("Database is not configured"); };
 if (DATABASE_URL) {
   pool = new Pool({ connectionString: DATABASE_URL });
   q = (text, params) => pool.query(text, params);
@@ -131,12 +129,13 @@ if (DATABASE_URL) {
 
 const app = express();
 
-// Memory storage + strict file size (keeps RAM controlled)
+// ---------- Multer (uploads) ----------
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 12 * 1024 * 1024 }, // 12MB
 });
 
+// ---------- Stripe ----------
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
 // ---------- Static sticker config ----------
@@ -298,19 +297,20 @@ async function pickSkuForCountry({ preferredSku, countryCode }) {
 // ---------- Nodemailer ----------
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
-  port: parseInt(SMTP_PORT, 10),
-  secure: SMTP_PORT === "465",
-  auth: { user: SMTP_USER, pass: SMTP_PASS },
+  port: parseInt(SMTP_PORT || "587", 10),
+  secure: (SMTP_PORT === "465"),
+  auth: SMTP_USER && SMTP_PASS ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
 });
 
-// ---------- Static assets ----------
+// ---------- Static files ----------
 app.use("/images", express.static(path.join(process.cwd(), "src/public/images"), {
   maxAge: "7d",
 }));
 
-// ---------- Cookies & JSON ----------
-app.use(cookieParser());
-app.use(express.static("public"));
+// Signed cookies
+app.use(cookieParser(SESSION_SECRET || "dev-secret"));
+
+// ---------- JSON parsing (skip raw for Stripe webhook) ----------
 app.use((req, res, next) => {
   if (req.originalUrl === "/webhook") {
     next(); // Stripe webhook uses raw body parsing below
@@ -319,86 +319,81 @@ app.use((req, res, next) => {
   }
 });
 
-// ---------- Session helpers ----------
-const SESSION_TTL_HOURS = 24 * 30;
+// Also serve ./public as static root (index.html, etc.)
+app.use(express.static("public"));
 
-const signValue = (v) =>
-  crypto.createHmac("sha256", SESSION_SECRET).update(v).digest("hex");
+// ===== Auth helpers & middleware =====
+const COOKIE_NAME = SESSION_COOKIE_NAME || "sid";
+const ORIGIN = APP_ORIGIN || "http://localhost:3000";
+const SESSION_TTL_DAYS = 180;
 
-async function createSession(userId, res) {
-  const expires = new Date(Date.now() + SESSION_TTL_HOURS * 3600 * 1000);
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate()+n); return x; }
+function hashToken(raw) { return crypto.createHash("sha256").update(raw).digest("hex"); }
+
+async function createSession(userId) {
+  const expires = addDays(new Date(), SESSION_TTL_DAYS);
   const { rows } = await q(
-    `insert into sessions (user_id, expires_at) values ($1,$2) returning id`,
+    `insert into sessions (user_id, expires_at) values ($1,$2) returning id, expires_at`,
     [userId, expires]
   );
-  const sid = rows[0].id;
-  const sig = signValue(sid);
-  res.cookie(SESSION_COOKIE_NAME, `${sid}.${sig}`, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    expires,
-  });
+  return rows[0];
 }
 
-async function destroySessionCookie(req, res) {
-  try {
-    const raw = req.cookies[SESSION_COOKIE_NAME];
-    if (raw) {
-      const [sid] = String(raw).split(".");
-      if (sid) await q(`delete from sessions where id=$1`, [sid]).catch(() => {});
-    }
-  } finally {
-    res.clearCookie(SESSION_COOKIE_NAME, { httpOnly: true, secure: true, sameSite: "lax" });
-  }
+async function getSessionAndUser(sessionId) {
+  const { rows } = await q(`
+    select s.id as session_id, s.expires_at, u.id as user_id, u.email,
+           coalesce(sub.plan,'free') as plan, coalesce(sub.status,'inactive') as status
+    from sessions s
+    join users u on u.id = s.user_id
+    left join subscriptions sub on sub.user_id = u.id
+    where s.id = $1 and s.expires_at > now()
+    limit 1
+  `, [sessionId]);
+  return rows[0] || null;
 }
 
-async function sessionMiddleware(req, _res, next) {
-  const raw = req.cookies[SESSION_COOKIE_NAME];
-  if (!raw) return next();
-  const [sid, sig] = String(raw).split(".");
-  if (!sid || signValue(sid) !== sig) return next();
-
+// Attach req.user if cookie present
+app.use(async (req, res, next) => {
   try {
-    const { rows } = await q(
-      `select s.id, s.expires_at, u.id as user_id, u.email,
-              coalesce((select plan from subscriptions where user_id=u.id and status='active' order by updated_at desc limit 1),'free') as plan
-       from sessions s
-       join users u on u.id=s.user_id
-       where s.id=$1 and s.expires_at > now()`,
-      [sid]
-    );
-    if (rows[0]) {
-      req.user = { id: rows[0].user_id, email: rows[0].email, plan: rows[0].plan, sid };
-    }
+    if (!pool) return next();
+    const sid = req.signedCookies?.[COOKIE_NAME];
+    if (!sid) return next();
+    const sess = await getSessionAndUser(sid);
+    if (!sess) return next();
+    req.user = { id: sess.user_id, email: sess.email, plan: sess.plan, subStatus: sess.status, sessionId: sess.session_id };
+    next();
   } catch (e) {
-    // If DB not configured, just skip
+    console.error("session middleware error:", e);
+    next();
   }
+});
+
+function requireAuth(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: "Auth required" });
   next();
 }
-app.use(sessionMiddleware);
 
-// ---------- Auth routes (magic-link) ----------
-// Start login: POST /auth/start { email }
+// ===== Magic-link routes =====
+
+// Start login: send magic link
 app.post("/auth/start", express.json(), async (req, res) => {
   try {
-    const emailRaw = String(req.body?.email || "").trim().toLowerCase();
-    if (!emailRaw || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailRaw)) {
-      return res.status(400).json({ error: "Valid email required" });
-    }
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    if (!email || !email.includes("@")) return res.status(400).json({ error: "Valid email required" });
 
     // Upsert user
-    const { rows: userRows } = await q(
+    const u = await q(
       `insert into users (email) values ($1)
-       on conflict (email) do update set email=excluded.email
+       on conflict (email) do update set email = excluded.email
        returning id, email`,
-      [emailRaw]
+      [email]
     );
-    const user = userRows[0];
+    const user = u.rows[0];
 
-    // Create a one-time login token
-    const tokenPlain = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto.createHash("sha256").update(tokenPlain).digest("hex");
+    // Issue one-time token (15 min)
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = hashToken(rawToken);
     const expires = new Date(Date.now() + 15 * 60 * 1000);
 
     await q(
@@ -406,78 +401,109 @@ app.post("/auth/start", express.json(), async (req, res) => {
       [user.id, tokenHash, expires]
     );
 
-    const link = `${APP_ORIGIN}/auth/callback?token=${tokenPlain}`;
+    const link = `${ORIGIN}/auth/callback?token=${encodeURIComponent(rawToken)}&uid=${encodeURIComponent(user.id)}`;
 
-    // Email the link
-    await transporter.sendMail({
-      from: `"boat2merch" <${SMTP_USER}>`,
-      to: user.email,
-      subject: "Your Boat2Merch sign-in link",
-      text: `Sign in by clicking this link (valid for 15 minutes): ${link}`,
-      html: `<p>Sign in by clicking this link (valid for 15 minutes):<br>
-             <a href="${link}">${link}</a></p>`,
-    });
+    // Send mail
+    const emailHtml = `
+      <p>Hi!</p>
+      <p>Click to sign in to Boat2Merch:</p>
+      <p><a href="${link}" style="background:#ff9800;color:#121212;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:700;">Sign in</a></p>
+      <p>This link expires in 15 minutes.</p>
+    `;
+    if (SMTP_USER) {
+      await transporter.sendMail({
+        from: `"boat2merch" <${SMTP_USER}>`,
+        to: email,
+        subject: "Your Boat2Merch sign-in link",
+        html: emailHtml
+      });
+    }
 
-    res.json({ ok: true });
+    // For dev convenience you can also return link; comment out in prod if you want
+    res.json({ ok: true, sent: true /* , link */ });
   } catch (e) {
-    console.error("auth/start error", e);
+    console.error("auth/start error:", e);
     res.status(500).json({ error: "Failed to start login" });
   }
 });
 
-// Complete login: GET /auth/callback?token=...
+// Magic-link callback: consume token, create session, set cookie, redirect
 app.get("/auth/callback", async (req, res) => {
   try {
-    const tokenPlain = String(req.query.token || "");
-    if (!tokenPlain) return res.status(400).send("Bad token");
+    if (!pool) return res.status(500).send("DB not configured");
+    const raw = String(req.query.token || "");
+    const uid = String(req.query.uid || "");
+    if (!raw || !uid) return res.status(400).send("Missing token");
 
-    const tokenHash = crypto.createHash("sha256").update(tokenPlain).digest("hex");
+    const h = hashToken(raw);
     const { rows } = await q(
-      `select lt.id, lt.user_id
-       from login_tokens lt
-       where lt.token_hash=$1 and lt.used=false and lt.expires_at > now()
-       order by lt.created_at desc
+      `select id, user_id, expires_at, used from login_tokens
+       where user_id = $1 and token_hash = $2
        limit 1`,
-      [tokenHash]
+      [uid, h]
     );
+    const tok = rows[0];
+    if (!tok) return res.status(400).send("Invalid link");
+    if (tok.used) return res.status(400).send("Link already used");
+    if (new Date(tok.expires_at) < new Date()) return res.status(400).send("Link expired");
 
-    if (!rows[0]) return res.status(400).send("Invalid or expired link");
+    // mark used
+    await q(`update login_tokens set used = true where id = $1`, [tok.id]);
 
-    // Mark token used
-    await q(`update login_tokens set used=true where id=$1`, [rows[0].id]);
+    // create session
+    const sess = await createSession(tok.user_id);
 
-    // Create a session + cookie
-    await createSession(rows[0].user_id, res);
+    // set signed cookie
+    res.cookie(COOKIE_NAME, sess.id, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      signed: true,
+      expires: new Date(sess.expires_at)
+    });
 
-    // Redirect back to app
-    res.redirect("/index.html");
+    // back home
+    res.redirect(ORIGIN);
   } catch (e) {
-    console.error("auth/callback error", e);
-    res.status(500).send("Auth failed");
+    console.error("auth/callback error:", e);
+    res.status(500).send("Login failed");
   }
 });
 
-// POST /logout
-app.post("/logout", async (req, res) => {
-  await destroySessionCookie(req, res);
-  res.json({ ok: true });
-});
-
-// GET /me
+// Who am I
 app.get("/me", async (req, res) => {
-  if (!req.user) return res.status(200).json({ user: null });
-  res.json({ user: req.user });
+  if (!req.user) return res.json({ user: null });
+  res.json({ user: { id: req.user.id, email: req.user.email, plan: req.user.plan, status: req.user.subStatus } });
 });
 
-// Quick DB sanity check
-app.get("/debug/db", async (_req, res) => {
+// Logout
+app.post("/logout", (req, res) => {
   try {
-    const { rows } = await q(
-      `SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name`
+    if (req.user?.sessionId && pool) {
+      q(`delete from sessions where id = $1`, [req.user.sessionId]).catch(()=>{});
+    }
+  } finally {
+    res.clearCookie(COOKIE_NAME, { httpOnly:true, secure:true, sameSite:"lax", signed:true });
+    res.json({ ok: true });
+  }
+});
+
+// (Optional) Log a successful generation view/download for a signed-in user
+app.post("/log-generation", express.json(), async (req, res) => {
+  try {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    if (!req.user) return res.status(401).json({ error: "Auth required" });
+    const { externalId, mode } = req.body || {};
+    if (!externalId || !mode) return res.status(400).json({ error: "externalId and mode required" });
+    await q(
+      `insert into generations (user_id, mode, external_id) values ($1,$2,$3)
+       on conflict (user_id, external_id) do nothing`,
+      [req.user.id, mode, externalId]
     );
-    res.json({ ok: true, tables: rows.map((r) => r.table_name) });
+    res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
+    console.error("log-generation error:", e);
+    res.status(500).json({ error: "Failed to log" });
   }
 });
 
@@ -533,14 +559,16 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          // IMPORTANT: Replicate's OpenAI wrapper needs "version", not "model"
           version: GPT_IMAGE_VERSION,
           input: {
             input_images: [imageRef],
-            image: imageRef,
+            image: imageRef, // compatibility
             prompt,
-            background: backgroundSetting,
+            background: backgroundSetting, // enforce white vs transparent per mode
             openai_api_key: OPENAI_API_KEY,
             quality: "auto",
+            // aspect_ratio: (removed to avoid forced square cropping)
             input_fidelity: "high",
             moderation: "auto",
             number_of_images: 1,
@@ -623,7 +651,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   }
 });
 
-// List images for the examples page
+// ---------- List images for the examples page ----------
 app.get("/images/list", async (req, res) => {
   try {
     const dir = path.join(process.cwd(), "src/public/images");
@@ -631,11 +659,11 @@ app.get("/images/list", async (req, res) => {
 
     const allow = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif"]);
     const files = entries
-      .filter((d) => d.isFile())
-      .map((d) => d.name)
-      .filter((name) => allow.has(path.extname(name).toLowerCase()))
+      .filter(d => d.isFile())
+      .map(d => d.name)
+      .filter(name => allow.has(path.extname(name).toLowerCase()))
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-      .map((name) => `/images/${name}`);
+      .map(name => `/images/${name}`);
 
     res.json(files);
   } catch (err) {
@@ -654,11 +682,7 @@ app.get("/prediction-status/:id", async (req, res) => {
 
     const text = await statusResp.text();
     let statusData;
-    try {
-      statusData = JSON.parse(text);
-    } catch {
-      statusData = null;
-    }
+    try { statusData = JSON.parse(text); } catch { statusData = null; }
 
     if (!statusResp.ok) {
       return res.status(502).json({
@@ -719,7 +743,7 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     Items: [
       {
         Quantity: 1,
-        SKU: sku, // validated country-enabled catalog SKU
+        SKU: sku,                    // validated country-enabled catalog SKU
         ShipType: "standard",
         Images: [{ Url: imageUrl }], // dynamic art
         SourceId: safeId,
@@ -776,7 +800,7 @@ app.post("/create-checkout-session", async (req, res) => {
         buyerName: name,
         buyerAddress: JSON.stringify(address),
       },
-      success_url: "https://boat2merch.onrender.com/thank-you.html",
+      success_url: `${ORIGIN}/thank-you.html`,
       cancel_url: "https://boat2merch.com",
     });
 
@@ -854,13 +878,15 @@ app.post(
           <p><strong>Sticker Image:</strong></p>
           <img src="${imageUrl}" alt="Purchased Sticker" style="max-width:300px; border:1px solid #ccc; border-radius:6px;" />
         `;
-        await transporter.sendMail({
-          from: `"boat2merch" <${SMTP_USER}>`,
-          to: "charliebrayton8@gmail.com",
-          subject: `New Sticker Order from ${buyerName}`,
-          html: emailHtml,
-        });
-        console.log("✅ Order email sent");
+        if (SMTP_USER) {
+          await transporter.sendMail({
+            from: `"boat2merch" <${SMTP_USER}>`,
+            to: "charliebrayton8@gmail.com",
+            subject: `New Sticker Order from ${buyerName}`,
+            html: emailHtml,
+          });
+          console.log("✅ Order email sent");
+        }
       } catch (mailErr) {
         console.error("❌ Error sending order email:", mailErr);
       }
