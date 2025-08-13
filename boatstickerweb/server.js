@@ -8,13 +8,16 @@ import nodemailer from "nodemailer";
 import sharp from "sharp"; // JPEG/WEBP -> PNG, resize, auto-orient
 import path from "path";
 import fs from "fs/promises";
+import cookieParser from "cookie-parser";
+import crypto from "crypto";
 
-// ==== NEW: Postgres bootstrap (safe run-once migration) ====
+// ==== Postgres bootstrap (safe run-once migration) ====
 import pkg from "pg";
 const { Pool } = pkg;
 
 const {
   DATABASE_URL,
+
   // Image gen
   REPLICATE_API_TOKEN,
   OPENAI_API_KEY,
@@ -36,11 +39,18 @@ const {
 
   // Optional override (validated against country; ignored if unavailable)
   GOOTEN_STICKER_SKU,
+
+  // Sessions / app
+  APP_ORIGIN = "http://localhost:3000",
+  SESSION_COOKIE_NAME = "sid",
+  SESSION_SECRET = "change-me",
 } = process.env;
 
 // Create a pool if DATABASE_URL is present (Render env)
 let pool = null;
-let q = async () => { throw new Error("Database is not configured"); };
+let q = async () => {
+  throw new Error("Database is not configured");
+};
 if (DATABASE_URL) {
   pool = new Pool({ connectionString: DATABASE_URL });
   q = (text, params) => pool.query(text, params);
@@ -293,17 +303,181 @@ const transporter = nodemailer.createTransport({
   auth: { user: SMTP_USER, pass: SMTP_PASS },
 });
 
+// ---------- Static assets ----------
 app.use("/images", express.static(path.join(process.cwd(), "src/public/images"), {
   maxAge: "7d",
 }));
 
-// ---------- Static + JSON parsing ----------
+// ---------- Cookies & JSON ----------
+app.use(cookieParser());
 app.use(express.static("public"));
 app.use((req, res, next) => {
   if (req.originalUrl === "/webhook") {
     next(); // Stripe webhook uses raw body parsing below
   } else {
-    express.json({ limit: "2mb" })(req, res, next); // keep JSON body small
+    express.json({ limit: "2mb" })(req, res, next);
+  }
+});
+
+// ---------- Session helpers ----------
+const SESSION_TTL_HOURS = 24 * 30;
+
+const signValue = (v) =>
+  crypto.createHmac("sha256", SESSION_SECRET).update(v).digest("hex");
+
+async function createSession(userId, res) {
+  const expires = new Date(Date.now() + SESSION_TTL_HOURS * 3600 * 1000);
+  const { rows } = await q(
+    `insert into sessions (user_id, expires_at) values ($1,$2) returning id`,
+    [userId, expires]
+  );
+  const sid = rows[0].id;
+  const sig = signValue(sid);
+  res.cookie(SESSION_COOKIE_NAME, `${sid}.${sig}`, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    expires,
+  });
+}
+
+async function destroySessionCookie(req, res) {
+  try {
+    const raw = req.cookies[SESSION_COOKIE_NAME];
+    if (raw) {
+      const [sid] = String(raw).split(".");
+      if (sid) await q(`delete from sessions where id=$1`, [sid]).catch(() => {});
+    }
+  } finally {
+    res.clearCookie(SESSION_COOKIE_NAME, { httpOnly: true, secure: true, sameSite: "lax" });
+  }
+}
+
+async function sessionMiddleware(req, _res, next) {
+  const raw = req.cookies[SESSION_COOKIE_NAME];
+  if (!raw) return next();
+  const [sid, sig] = String(raw).split(".");
+  if (!sid || signValue(sid) !== sig) return next();
+
+  try {
+    const { rows } = await q(
+      `select s.id, s.expires_at, u.id as user_id, u.email,
+              coalesce((select plan from subscriptions where user_id=u.id and status='active' order by updated_at desc limit 1),'free') as plan
+       from sessions s
+       join users u on u.id=s.user_id
+       where s.id=$1 and s.expires_at > now()`,
+      [sid]
+    );
+    if (rows[0]) {
+      req.user = { id: rows[0].user_id, email: rows[0].email, plan: rows[0].plan, sid };
+    }
+  } catch (e) {
+    // If DB not configured, just skip
+  }
+  next();
+}
+app.use(sessionMiddleware);
+
+// ---------- Auth routes (magic-link) ----------
+// Start login: POST /auth/start { email }
+app.post("/auth/start", express.json(), async (req, res) => {
+  try {
+    const emailRaw = String(req.body?.email || "").trim().toLowerCase();
+    if (!emailRaw || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailRaw)) {
+      return res.status(400).json({ error: "Valid email required" });
+    }
+
+    // Upsert user
+    const { rows: userRows } = await q(
+      `insert into users (email) values ($1)
+       on conflict (email) do update set email=excluded.email
+       returning id, email`,
+      [emailRaw]
+    );
+    const user = userRows[0];
+
+    // Create a one-time login token
+    const tokenPlain = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(tokenPlain).digest("hex");
+    const expires = new Date(Date.now() + 15 * 60 * 1000);
+
+    await q(
+      `insert into login_tokens (user_id, token_hash, expires_at) values ($1,$2,$3)`,
+      [user.id, tokenHash, expires]
+    );
+
+    const link = `${APP_ORIGIN}/auth/callback?token=${tokenPlain}`;
+
+    // Email the link
+    await transporter.sendMail({
+      from: `"boat2merch" <${SMTP_USER}>`,
+      to: user.email,
+      subject: "Your Boat2Merch sign-in link",
+      text: `Sign in by clicking this link (valid for 15 minutes): ${link}`,
+      html: `<p>Sign in by clicking this link (valid for 15 minutes):<br>
+             <a href="${link}">${link}</a></p>`,
+    });
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("auth/start error", e);
+    res.status(500).json({ error: "Failed to start login" });
+  }
+});
+
+// Complete login: GET /auth/callback?token=...
+app.get("/auth/callback", async (req, res) => {
+  try {
+    const tokenPlain = String(req.query.token || "");
+    if (!tokenPlain) return res.status(400).send("Bad token");
+
+    const tokenHash = crypto.createHash("sha256").update(tokenPlain).digest("hex");
+    const { rows } = await q(
+      `select lt.id, lt.user_id
+       from login_tokens lt
+       where lt.token_hash=$1 and lt.used=false and lt.expires_at > now()
+       order by lt.created_at desc
+       limit 1`,
+      [tokenHash]
+    );
+
+    if (!rows[0]) return res.status(400).send("Invalid or expired link");
+
+    // Mark token used
+    await q(`update login_tokens set used=true where id=$1`, [rows[0].id]);
+
+    // Create a session + cookie
+    await createSession(rows[0].user_id, res);
+
+    // Redirect back to app
+    res.redirect("/index.html");
+  } catch (e) {
+    console.error("auth/callback error", e);
+    res.status(500).send("Auth failed");
+  }
+});
+
+// POST /logout
+app.post("/logout", async (req, res) => {
+  await destroySessionCookie(req, res);
+  res.json({ ok: true });
+});
+
+// GET /me
+app.get("/me", async (req, res) => {
+  if (!req.user) return res.status(200).json({ user: null });
+  res.json({ user: req.user });
+});
+
+// Quick DB sanity check
+app.get("/debug/db", async (_req, res) => {
+  try {
+    const { rows } = await q(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name`
+    );
+    res.json({ ok: true, tables: rows.map((r) => r.table_name) });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
   }
 });
 
@@ -359,16 +533,14 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          // IMPORTANT: Replicate's OpenAI wrapper needs "version", not "model"
           version: GPT_IMAGE_VERSION,
           input: {
             input_images: [imageRef],
-            image: imageRef, // compatibility
+            image: imageRef,
             prompt,
-            background: backgroundSetting, // enforce white vs transparent per mode
+            background: backgroundSetting,
             openai_api_key: OPENAI_API_KEY,
             quality: "auto",
-            // aspect_ratio: (removed to avoid forced square cropping)
             input_fidelity: "high",
             moderation: "auto",
             number_of_images: 1,
@@ -451,7 +623,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   }
 });
 
-// 2) List images for the examples page
+// List images for the examples page
 app.get("/images/list", async (req, res) => {
   try {
     const dir = path.join(process.cwd(), "src/public/images");
@@ -459,11 +631,11 @@ app.get("/images/list", async (req, res) => {
 
     const allow = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif"]);
     const files = entries
-      .filter(d => d.isFile())
-      .map(d => d.name)
-      .filter(name => allow.has(path.extname(name).toLowerCase()))
+      .filter((d) => d.isFile())
+      .map((d) => d.name)
+      .filter((name) => allow.has(path.extname(name).toLowerCase()))
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-      .map(name => `/images/${name}`);
+      .map((name) => `/images/${name}`);
 
     res.json(files);
   } catch (err) {
@@ -482,7 +654,11 @@ app.get("/prediction-status/:id", async (req, res) => {
 
     const text = await statusResp.text();
     let statusData;
-    try { statusData = JSON.parse(text); } catch { statusData = null; }
+    try {
+      statusData = JSON.parse(text);
+    } catch {
+      statusData = null;
+    }
 
     if (!statusResp.ok) {
       return res.status(502).json({
@@ -543,7 +719,7 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
     Items: [
       {
         Quantity: 1,
-        SKU: sku,                    // validated country-enabled catalog SKU
+        SKU: sku, // validated country-enabled catalog SKU
         ShipType: "standard",
         Images: [{ Url: imageUrl }], // dynamic art
         SourceId: safeId,
