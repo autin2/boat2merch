@@ -228,13 +228,12 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     const isSticker = mode === "sticker";
 
     // Prompts per mode
-    const prompt = isSticker
-      ? "Create a clean, high-contrast black and white line drawing of the boat shown in the input image, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background, no extra elements, no shadows."
-      : "Create a clean, high-contrast black and white line drawing of the boat shown in the input image. The entire background must be solid pure white. No extra elements, no shadows, no artistic effects — just a clear outline and main details of the boat.";
+   const prompt = isSticker
+  ? "Create a clean, high-contrast black and white line drawing of the boat shown in the input image, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background, no extra elements, no shadows."
+  : "Create a clean, high-contrast black and white line drawing of the boat shown in the input image. The background must be fully solid white. No extra elements, no shadows, no artistic effects — just a clear outline and main details of the boat.";
 
     // Background control per mode (this is what actually enforces the white vs transparent)
-    const backgroundSetting = isSticker ? "transparent" : "white";
-
+    const backgroundSetting = isSticker ? "transparent" : "opaque";
     // Normalize to PNG and keep payload modest
     let pngBuffer;
     try {
@@ -581,3 +580,4 @@ app.post(
 // ---------- Start server ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
