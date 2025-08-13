@@ -5,49 +5,241 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Contact Boat2Merch for questions, support, or partnerships." />
   <meta name="keywords" content="contact, support, boat stickers, print on demand" />
-  <meta name="author" content="Your Brand Name" />
+  <meta name="author" content="Boat2Merch" />
   <title>Contact - Boat2Merch</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/icon.png?v=3">
   <link rel="stylesheet" href="style.css" />
+
+  <style>
+    /* --- Page-scoped styling for the contact page --- */
+
+    .contact-hero {
+      padding: 56px 0 12px;
+      text-align: center;
+      background: radial-gradient(70% 60% at 50% 0%, rgba(255,152,0,.12), rgba(0,0,0,0) 60%);
+    }
+    .contact-hero h1 { margin: 0 0 8px; }
+    .contact-hero p  { margin: 0; }
+
+    .contact-shell {
+      max-width: 760px;
+      margin: 28px auto 60px;
+      padding: 0 20px;
+    }
+
+    .contact-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 16px;
+      background: #161616;
+      border: 1px solid #2b2b2b;
+      box-shadow:
+        0 12px 32px rgba(0,0,0,.35),
+        0 0 0 1px rgba(255,152,0,.10) inset;
+    }
+
+    /* Decorative top accent line that softly glows */
+    .contact-card::before {
+      content:"";
+      position:absolute; left:0; right:0; top:0; height:3px;
+      background: linear-gradient(90deg, transparent, #ff9800, #ffd28a, #ff9800, transparent);
+      filter: blur(.2px);
+      opacity:.9;
+    }
+
+    .contact-inner {
+      padding: 26px 22px;
+    }
+    @media (min-width: 640px) {
+      .contact-inner {
+        padding: 34px 30px;
+      }
+    }
+
+    /* Form layout */
+    .form-grid {
+      display: grid;
+      gap: 16px;
+    }
+    @media (min-width: 640px) {
+      .form-grid.two-col {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    /* Floating labels */
+    .field {
+      position: relative;
+    }
+    .field input,
+    .field textarea {
+      width: 100%;
+      padding: 14px 12px 14px 12px;
+      border-radius: 10px;
+      border: 1px solid #333;
+      background: #1f1f1f;
+      color: #eee;
+      font-size: 1rem;
+      transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+    }
+    .field textarea { resize: vertical; min-height: 140px; }
+
+    .field input::placeholder,
+    .field textarea::placeholder { color: transparent; } /* hide placeholders for floating label */
+
+    .field label {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      color: #a9a9a9;
+      font-size: .95rem;
+      pointer-events: none;
+      transition: transform .15s ease, color .15s ease, top .15s ease, font-size .15s ease, opacity .15s ease;
+      background: transparent;
+      padding: 0 6px;
+      border-radius: 6px;
+    }
+
+    /* Lift label when focused or has content */
+    .field:has(input:focus),
+    .field:has(textarea:focus) { z-index: 1; }
+
+    .field input:focus,
+    .field textarea:focus {
+      outline: none;
+      border-color: #ff9800;
+      background: #232323;
+      box-shadow: 0 0 0 3px rgba(255,152,0,.15);
+    }
+
+    .field input:not(:placeholder-shown) + label,
+    .field textarea:not(:placeholder-shown) + label,
+    .field input:focus + label,
+    .field textarea:focus + label {
+      top: -9px;
+      font-size: .78rem;
+      color: #ffb347;
+      background: #161616;
+    }
+
+    /* Helper row (privacy + submit) */
+    .form-footer {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      margin-top: 8px;
+    }
+    .hint {
+      color:#bcbcbc;
+      font-size: .9rem;
+    }
+
+    /* Subtle divider text */
+    .contact-meta {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px dashed #2f2f2f;
+      color: #bcbcbc;
+      font-size: .95rem;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .contact-meta a { color: #ffd28a; text-decoration: none; }
+    .contact-meta a:hover { text-decoration: underline; }
+
+    /* Reduce motion preference */
+    @media (prefers-reduced-motion: reduce) {
+      .field input,
+      .field textarea,
+      .field label { transition: none; }
+    }
+  </style>
 </head>
 <body>
 
   <!-- Header -->
-  <header>
-    <div class="logo">🚤 Boat2Merch</div>
-    <nav>
-      <a href="index.html">Home</a>
-      <a href="how-it-works.html">How It Works</a>
-      <a href="pricing.html">Pricing</a>
-      <a href="examples.html">Examples</a>
-      <a href="contact.html" class="active">Contact</a>
-    </nav>
+  <header class="site-header">
+    <div class="container nav-row">
+      <div class="brand">
+        <img src="/images/icon.png" class="logo-img" alt="" width="24" height="24" />
+        <span>Boat2Merch</span>
+      </div>
+      <nav class="topnav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="how-it-works.html">How It Works</a>
+        <a href="pricing.html">Pricing</a>
+        <a href="examples.html">Examples</a>
+        <a href="contact.html" class="active">Contact</a>
+      </nav>
+    </div>
   </header>
 
-  <!-- Page Header -->
-  <section class="page-header">
-    <h1>Contact Us</h1>
-    <p>Have questions or want to collaborate? Send us a message.</p>
+  <!-- Hero -->
+  <section class="contact-hero">
+    <div class="container">
+      <h1>Contact Us</h1>
+      <p class="muted">Questions, feedback, or partnership ideas? We’d love to hear from you.</p>
+    </div>
   </section>
 
-  <!-- Contact Form -->
-  <section class="contact-form">
-    <form action="https://formspree.io/f/mzzvvgkg" method="POST">
-      <label for="name">Name</label>
-      <input type="text" id="name" name="name" required placeholder="Your name" />
+  <!-- Contact Card -->
+  <section class="contact-shell">
+    <div class="contact-card">
+      <div class="contact-inner">
+        <!-- Keep Formspree prompts intact -->
+        <form action="https://formspree.io/f/mzzvvgkg" method="POST" accept-charset="UTF-8" novalidate>
+          <!-- Honeypot to reduce spam (Formspree ignores unknown fields) -->
+          <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" style="position:absolute; left:-10000px; opacity:0;" aria-hidden="true">
 
-      <label for="email">Email</label>
-      <input type="email" id="email" name="_replyto" required placeholder="Your email" />
+          <!-- Optional subject to make emails clearer (supported by Formspree) -->
+          <input type="hidden" name="_subject" value="Boat2Merch — Contact Form Submission">
 
-      <label for="message">Message</label>
-      <textarea id="message" name="message" rows="5" required placeholder="Write your message here"></textarea>
+          <div class="form-grid two-col">
+            <!-- Name -->
+            <div class="field">
+              <input id="name" name="name" type="text" placeholder="Your name" required autocomplete="name" />
+              <label for="name">Name</label>
+            </div>
 
-      <button type="submit" class="btn-primary">Send Message</button>
-    </form>
+            <!-- Email -->
+            <div class="field">
+              <input id="email" name="_replyto" type="email" placeholder="you@example.com" required autocomplete="email" inputmode="email" />
+              <label for="email">Email</label>
+            </div>
+          </div>
+
+          <!-- Message -->
+          <div class="form-grid">
+            <div class="field">
+              <textarea id="message" name="message" rows="6" placeholder="Write your message here" required></textarea>
+              <label for="message">Message</label>
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <span class="hint">We typically respond within 1–2 business days.</span>
+            <button type="submit" class="btn btn-primary">Send Message</button>
+          </div>
+
+          <div class="contact-meta">
+            <span>Prefer email? Reach us at <a href="mailto:support@boat2merch.com">support@boat2merch.com</a></span>
+            <span class="muted">By submitting, you agree to our <a href="#">terms</a>.</span>
+          </div>
+        </form>
+      </div>
+    </div>
   </section>
 
   <!-- Footer -->
   <footer>
-    <p>&copy; 2025 Boat2Merch | All rights reserved.</p>
+    <div class="container">
+      <p>&copy; 2025 Boat2Merch · All rights reserved.</p>
+    </div>
   </footer>
 
 </body>
