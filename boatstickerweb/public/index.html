@@ -7,6 +7,8 @@
   <meta name="keywords" content="boat sticker, boat shirt, custom boat print, AI boat art, personalized boat merchandise" />
   <meta name="author" content="Boat2Merch" />
   <title>Boat2Merch — Turn Your Boat into Stickers & Shirts</title>
+
+  <!-- Favicon / App Icon -->
   <link rel="icon" type="image/png" sizes="32x32" href="/src/public/images/sportfishing-boat-32.png">
 
   <link rel="stylesheet" href="style.css" />
@@ -16,7 +18,9 @@
   <header class="site-header">
     <div class="container nav-row">
       <div class="brand">
-        <span class="logo-emoji">🚤</span> Boat2Merch
+        <!-- Replaced emoji with your icon -->
+        <img src="/src/public/images/sportfishing-boat-32.png" class="logo-img" alt="" width="24" height="24" />
+        <span>Boat2Merch</span>
       </div>
       <nav class="topnav" aria-label="Primary">
         <a href="index.html" class="active">Home</a>
@@ -36,8 +40,8 @@
         <h1 class="headline">Turn your boat photo into a clean, die-cut sticker — instantly.</h1>
         <p class="subhead">Upload a photo. Our AI returns a crisp line-art with an optional white contour, ready for stickers, shirts, and more.</p>
 
-        <!-- Action card -->
-        <div class="card pad" role="region" aria-label="Upload and settings">
+        <!-- Action area (transparent) -->
+        <div class="action-card" role="region" aria-label="Upload and settings">
           <!-- Hidden system file input -->
           <input type="file" id="boatUpload" accept="image/*" style="display:none" />
 
@@ -50,7 +54,7 @@
           <!-- Status -->
           <div id="statusArea" style="margin-top:12px;" aria-live="polite"></div>
 
-          <!-- Result -->
+          <!-- Result (kept as a card for clarity) -->
           <div id="resultPanel" class="card pad" style="margin-top:12px; display:none;">
             <p class="muted" style="margin:0 0 8px;">Your AI-generated output:</p>
             <img id="resultImage" class="result-img" alt="AI generated boat drawing" />
@@ -204,4 +208,3 @@
   </script>
 </body>
 </html>
-
