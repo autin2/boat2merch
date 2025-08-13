@@ -227,27 +227,31 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     const mode = (req.body?.mode || "sticker").toLowerCase();
     const isSticker = mode === "sticker";
 
-    // Prompts per mode
-   const prompt = isSticker
-  ? "Create a clean, high-contrast black and white line drawing of the boat shown in the input image, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background, no extra elements, no shadows."
-  : "Create a clean, high-contrast black and white line drawing of the boat shown in the input image. The background must be fully solid white. No extra elements, no shadows, no artistic effects — just a clear outline and main details of the boat.";
+    // Prompts per mode (explicitly avoid cropping; include margin)
+    const prompt = isSticker
+      ? "Create a clean, high-contrast black and white line drawing of the boat shown in the input image, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background. Include the entire boat with a small margin; do not crop or cut off any part. No extra elements, no shadows."
+      : "Create a clean, high-contrast black and white line drawing of the boat shown in the input image. The background must be fully solid white. Include the entire boat with a small margin around it; do not crop or cut off any part. No extra elements, no shadows, no artistic effects — just a clear outline and main details of the boat.";
 
-    // Background control per mode (this is what actually enforces the white vs transparent)
+    // Background control per mode (this enforces white vs transparent)
     const backgroundSetting = isSticker ? "transparent" : "opaque";
-    // Normalize to PNG and keep payload modest
-    let pngBuffer;
-    try {
-      pngBuffer = await sharp(req.file.buffer)
-        .rotate()
-        .resize({ width: 1024, height: 1024, fit: "inside", withoutEnlargement: true })
-        .png({ compressionLevel: 9 })
-        .toBuffer();
-    } catch (e) {
-      console.warn("sharp conversion failed, forwarding original buffer:", e?.message);
-      pngBuffer = req.file.buffer;
-    } finally {
-      req.file.buffer = null; // free memory
-    }
+
+    // ---------- Input preprocessing: pad canvas to avoid tight crops ----------
+    // Resize inside a reasonable max, then extend canvas ~12% on all sides.
+    // Sticker gets transparent pad; Image gets white pad.
+    let img = sharp(req.file.buffer).rotate()
+      .resize({ width: 1280, height: 1280, fit: "inside", withoutEnlargement: true });
+
+    const meta = await img.metadata();
+    const base = Math.max(meta.width || 0, meta.height || 0) || 1024;
+    const pad = Math.round(base * 0.12);
+
+    img = img.extend({
+      top: pad, bottom: pad, left: pad, right: pad,
+      background: isSticker ? { r: 0, g: 0, b: 0, alpha: 0 } : "#ffffff"
+    });
+
+    const pngBuffer = await img.png({ compressionLevel: 9 }).toBuffer();
+    req.file.buffer = null; // free memory
 
     const kb = Math.round(pngBuffer.byteLength / 1024);
     console.log(`[generate-image] mode=${mode} input ~${kb}KB`);
@@ -267,13 +271,13 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
           version: GPT_IMAGE_VERSION,
           input: {
             input_images: [imageRef],
-            // Keep 'image' for compatibility with some wrappers
-            image: imageRef,
+            image: imageRef, // compatibility
             prompt,
-            background: backgroundSetting, // <-- enforce white vs transparent per mode
+            background: backgroundSetting, // enforce white vs transparent per mode
             openai_api_key: OPENAI_API_KEY,
             quality: "auto",
-            aspect_ratio: "1:1",
+            // aspect_ratio: (removed to avoid forced square cropping)
+            input_fidelity: "high",
             moderation: "auto",
             number_of_images: 1,
             output_format: "png",
@@ -580,4 +584,5 @@ app.post(
 // ---------- Start server ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
 
