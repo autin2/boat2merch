@@ -6,6 +6,8 @@ import FormData from "form-data";
 import Stripe from "stripe";
 import nodemailer from "nodemailer";
 import sharp from "sharp"; // JPEG/WEBP -> PNG, resize, auto-orient
+import path from "path";
+import fs from "fs/promises";
 
 const app = express();
 
@@ -205,6 +207,13 @@ const transporter = nodemailer.createTransport({
   auth: { user: SMTP_USER, pass: SMTP_PASS },
 });
 
+
+app.use("/images", express.static(path.join(process.cwd(), "src/public/images"), {
+  maxAge: "7d",
+}));
+
+
+
 // ---------- Static + JSON parsing ----------
 app.use(express.static("public"));
 app.use((req, res, next) => {
@@ -358,6 +367,29 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     res.status(500).json({ error: error?.message || "Failed to generate image" });
   }
 });
+
+// 2) List images for the examples page
+app.get("/images/list", async (req, res) => {
+  try {
+    const dir = path.join(process.cwd(), "src/public/images");
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+
+    const allow = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif"]);
+    const files = entries
+      .filter(d => d.isFile())
+      .map(d => d.name)
+      .filter(name => allow.has(path.extname(name).toLowerCase()))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .map(name => `/images/${name}`);
+
+    res.json(files);
+  } catch (err) {
+    console.error("IMAGE LIST ERROR:", err);
+    res.status(500).json({ error: "Failed to list images" });
+  }
+});
+
+
 
 // ---------- Poll prediction ----------
 app.get("/prediction-status/:id", async (req, res) => {
@@ -584,5 +616,6 @@ app.post(
 // ---------- Start server ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
 
 
