@@ -529,3 +529,27 @@ section .card.pad {
 @media (prefers-reduced-motion: reduce) {
   .btn, .card, nav.topnav a::after { transition: none; }
 }
+
+/* ==== AUTH MODAL ==== */
+#authModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+#authModal .modal-content {
+  background: #fff;
+  color: #000;
+  padding: 20px;
+  border-radius: 8px;
+  width: 300px;
+  text-align: center;
+}
+#authModal input {
+  width: 100%;
+  padding: 8px;
+  margin: 8px 0;
+}
