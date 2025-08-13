@@ -10,27 +10,22 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/src/public/images/sportfishing-boat-32.png?v=2">
   <link rel="stylesheet" href="style.css" />
   <style>
-    /* --- Examples page only --- */
     :root {
       --gap: 16px;
       --cardMin: 220px;
       --cardMax: 300px;
       --imgH: 210px;
-      --speed: 48s; /* slower -> larger number */
+      --speed: 48s; /* base speed */
+      --slowSpeed: 96s; /* hover slowdown */
       --glow: 0 0 12px rgba(255,152,0,.45), 0 0 22px rgba(255,152,0,.25);
     }
-
     .examples-wrap .card.pad { overflow: hidden; }
-
-    /* Edge fade so the loop feels premium */
     .marquee {
       position: relative;
       overflow: hidden;
       mask-image: linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%);
       -webkit-mask-image: linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%);
     }
-
-    /* The rail holds TWO identical strips for seamless looping */
     .rail {
       display: inline-flex;
       align-items: stretch;
@@ -39,15 +34,13 @@
       width: max-content;
       animation: scroll var(--speed) linear infinite;
     }
-    .marquee:hover .rail,
-    .marquee:focus-within .rail { animation-play-state: paused; }
-
-    /* Move by 50% of total width because we duplicated the strip */
+    .marquee:hover .rail {
+      animation-duration: var(--slowSpeed);
+    }
     @keyframes scroll {
       from { transform: translateX(0); }
       to   { transform: translateX(calc(-50% - var(--gap)/2)); }
     }
-
     .ex-item {
       flex: 0 0 clamp(var(--cardMin), 24vw, var(--cardMax));
       background: #171717;
@@ -58,22 +51,10 @@
       transform-origin: center 70%;
       animation: bob 6s ease-in-out infinite;
     }
-    /* Subtle independent bob/tilt wave with staggered delays */
-    .ex-item:nth-child(1)  { animation-delay: .0s; }
-    .ex-item:nth-child(2)  { animation-delay: .4s; }
-    .ex-item:nth-child(3)  { animation-delay: .8s; }
-    .ex-item:nth-child(4)  { animation-delay: 1.2s; }
-    .ex-item:nth-child(5)  { animation-delay: 1.6s; }
-    .ex-item:nth-child(6)  { animation-delay: 2.0s; }
-    .ex-item:nth-child(7)  { animation-delay: 2.4s; }
-    .ex-item:nth-child(8)  { animation-delay: 2.8s; }
-    .ex-item:nth-child(9)  { animation-delay: 3.2s; }
-    .ex-item:nth-child(10) { animation-delay: 3.6s; }
     @keyframes bob {
       0%,100% { transform: translateY(0) rotate(0deg); }
       50%     { transform: translateY(-3px) rotate(-.6deg); }
     }
-
     .ex-item img {
       display: block;
       width: 100%;
@@ -95,13 +76,10 @@
       width: 8px; height: 8px; border-radius: 50%;
       background: #ff9800; box-shadow: 0 0 10px rgba(255,152,0,.7);
     }
-
-    /* Respect reduced motion */
     @media (prefers-reduced-motion: reduce) {
       .rail { animation: none; }
       .ex-item { animation: none; }
     }
-
     @media (max-width: 480px) {
       :root { --imgH: 230px; }
       .ex-item { flex-basis: 72vw; }
@@ -110,11 +88,11 @@
 </head>
 <body>
 
-  <!-- Header -->
   <header class="site-header">
     <div class="container nav-row">
       <div class="brand">
-        <span class="logo-emoji">🚤</span> Boat2Merch
+        <img src="/src/public/images/sportfishing-boat-32.png" class="logo-img" alt="" width="24" height="24" />
+        <span>Boat2Merch</span>
       </div>
       <nav class="topnav" aria-label="Primary">
         <a href="index.html">Home</a>
@@ -126,7 +104,6 @@
     </div>
   </header>
 
-  <!-- Page Header -->
   <section class="page-header">
     <div class="container">
       <h1>Examples</h1>
@@ -134,102 +111,18 @@
     </div>
   </section>
 
-  <!-- Continuous Marquee Carousel -->
   <section class="examples-wrap">
     <div class="container">
       <div class="card pad">
         <div class="marquee" aria-label="Example gallery (auto-scrolling)">
-          <div class="rail">
-            <!-- Strip A (top-to-bottom picks) -->
-            <figure class="ex-item">
-              <img src="/src/public/images/example1.png" alt="Clean line-art of center console boat" />
-              <figcaption class="ex-caption">Line-art (Image)</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example2.png" alt="Sticker with white contour around sailboat" />
-              <figcaption class="ex-caption">Sticker (White Contour)</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example3.png" alt="Bass boat simplified shapes" />
-              <figcaption class="ex-caption">Simplified Shapes</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example4.png" alt="Yacht minimal black-and-white drawing" />
-              <figcaption class="ex-caption">Minimal B/W</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example5.png" alt="Runabout line-art with high contrast" />
-              <figcaption class="ex-caption">High Contrast</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example6.png" alt="Pontoon boat with die-cut border" />
-              <figcaption class="ex-caption">Die-cut Border</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example7.png" alt="Fishing boat side view, crisp edges" />
-              <figcaption class="ex-caption">Crisp Edges</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example8.png" alt="Catamaran outline, transparent background" />
-              <figcaption class="ex-caption">Transparent BG</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example9.png" alt="Jet boat dynamic angle, simplified" />
-              <figcaption class="ex-caption">Dynamic Angle</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example10.png" alt="Sailboat with detailed mast lines" />
-              <figcaption class="ex-caption">Fine Lines</figcaption>
-            </figure>
-
-            <!-- Strip B (duplicate for seamless loop; empty alts for repetition) -->
-            <figure class="ex-item">
-              <img src="/src/public/images/example1.png" alt="" />
-              <figcaption class="ex-caption">Line-art (Image)</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example2.png" alt="" />
-              <figcaption class="ex-caption">Sticker (White Contour)</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example3.png" alt="" />
-              <figcaption class="ex-caption">Simplified Shapes</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example4.png" alt="" />
-              <figcaption class="ex-caption">Minimal B/W</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example5.png" alt="" />
-              <figcaption class="ex-caption">High Contrast</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example6.png" alt="" />
-              <figcaption class="ex-caption">Die-cut Border</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example7.png" alt="" />
-              <figcaption class="ex-caption">Crisp Edges</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example8.png" alt="" />
-              <figcaption class="ex-caption">Transparent BG</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example9.png" alt="" />
-              <figcaption class="ex-caption">Dynamic Angle</figcaption>
-            </figure>
-            <figure class="ex-item">
-              <img src="/src/public/images/example10.png" alt="" />
-              <figcaption class="ex-caption">Fine Lines</figcaption>
-            </figure>
+          <div class="rail" id="examplesRail">
+            <!-- Images populated by JS -->
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- CTA -->
   <section class="cta">
     <div class="container">
       <h2 style="margin:0 0 10px;">Make yours next</h2>
@@ -238,13 +131,38 @@
     </div>
   </section>
 
-  <!-- Footer -->
   <footer>
     <div class="container">
       <p>&copy; 2025 Boat2Merch · All rights reserved.</p>
     </div>
   </footer>
 
-  <!-- No JS needed. Adjust --speed in :root for faster/slower. -->
+  <script>
+    // Manually list or fetch from backend if you have file listing API
+    const allImages = [
+      "example1.png","example2.png","example3.png","example4.png",
+      "example5.png","example6.png","example7.png","example8.png",
+      "example9.png","example10.png","sportfishing-boat-32.png","icon.png"
+    ];
+    const skipFiles = ["icon.png","sportfishing-boat-32.png"];
+    const filtered = allImages.filter(img => !skipFiles.includes(img));
+
+    const rail = document.getElementById("examplesRail");
+    function makeFigure(src) {
+      const fig = document.createElement("figure");
+      fig.className = "ex-item";
+      const img = document.createElement("img");
+      img.src = `/src/public/images/${src}`;
+      img.alt = src;
+      const cap = document.createElement("figcaption");
+      cap.className = "ex-caption";
+      cap.textContent = src.replace(/\.[^/.]+$/, "").replace(/[-_]/g," ");
+      fig.appendChild(img);
+      fig.appendChild(cap);
+      return fig;
+    }
+    // Duplicate strip for seamless loop
+    [...filtered, ...filtered].forEach(file => rail.appendChild(makeFigure(file)));
+  </script>
 </body>
 </html>
