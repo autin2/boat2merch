@@ -315,7 +315,8 @@
 
         async function poll() {
           attempts++;
-          const statusResp = await fetch(`/prediction-status/${predictionId}`);
+          const statusResp = await fetch(`/prediction-status/${predictionId}?mode=${currentMode}`);
+
           const statusData = await statusResp.json();
 
           if (statusData.status === "succeeded" && statusData.output?.length) {
@@ -383,3 +384,4 @@
   </script>
 </body>
 </html>
+
