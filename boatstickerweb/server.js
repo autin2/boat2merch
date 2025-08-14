@@ -42,8 +42,12 @@ const {
   GOOTEN_PARTNER_BILLING_KEY,
   GOOTEN_TEST_MODE,
   GOOTEN_STICKER_SKU,
+
+  // === NEW: free plan throttling
+  FREE_DAILY_LIMIT = "3",   // default: 3 per 24h
 } = process.env;
 
+const FREE_LIMIT = Math.max(parseInt(FREE_DAILY_LIMIT, 10) || 3, 1); // === NEW
 const isProd = process.env.NODE_ENV === "production";
 
 // ---------- DB pool ----------
@@ -116,7 +120,6 @@ CREATE TABLE IF NOT EXISTS generations (
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (user_id, external_id)
 );
-
 `;
 
 // ---------- App + transports ----------
@@ -168,6 +171,40 @@ app.get("/healthz", async (_req, res) => {
 });
 
 /* ============================
+   AUTH helpers (NEW)
+   ============================ */
+async function getAuthedUser(req) { // === NEW
+  if (!pool) return null;
+  const sid = req.signedCookies?.[SESSION_COOKIE_NAME] || req.cookies?.[SESSION_COOKIE_NAME];
+  if (!sid) return null;
+  const now = new Date();
+  const { rows } = await q(
+    `SELECT u.id, u.email
+     FROM sessions s
+     JOIN users u ON u.id = s.user_id
+     WHERE s.id = $1 AND s.expires_at > $2
+     LIMIT 1`,
+    [sid, now]
+  );
+  return rows[0] || null;
+}
+
+async function getPlan(userId) { // === NEW
+  if (!pool || !userId) return "free";
+  const { rows } = await q(
+    `SELECT plan, status
+     FROM subscriptions
+     WHERE user_id=$1
+     ORDER BY updated_at DESC
+     LIMIT 1`,
+    [userId]
+  );
+  const s = rows[0];
+  if (s && s.plan === "pro" && s.status === "active") return "pro";
+  return "free";
+}
+
+/* ============================
    AUTH: magic-link endpoints
    ============================ */
 
@@ -197,9 +234,6 @@ async function createSession(res, userId) {
   const sid = rows[0].id;
   res.cookie(SESSION_COOKIE_NAME, sid, cookieOptions(90));
   return sid;
-}
-function getSessionIdFromReq(req) {
-  return req.signedCookies?.[SESSION_COOKIE_NAME] || req.cookies?.[SESSION_COOKIE_NAME];
 }
 
 app.post("/auth/send-link", async (req, res) => {
@@ -283,21 +317,9 @@ app.get("/auth/verify", async (req, res) => {
 
 app.get("/auth/session", async (req, res) => {
   try {
-    if (!pool) return res.json({ user: null });
-    const sid = getSessionIdFromReq(req);
-    if (!sid) return res.json({ user: null });
-
-    const now = new Date();
-    const { rows } = await q(
-      `SELECT u.email
-       FROM sessions s
-       JOIN users u ON u.id = s.user_id
-       WHERE s.id = $1 AND s.expires_at > $2
-       LIMIT 1`,
-      [sid, now]
-    );
-    if (!rows.length) return res.json({ user: null });
-    return res.json({ user: { email: rows[0].email } });
+    const user = await getAuthedUser(req);
+    if (!user) return res.json({ user: null });
+    return res.json({ user: { email: user.email } });
   } catch (err) {
     console.error("❌ /auth/session error:", err);
     res.status(500).json({ user: null });
@@ -307,7 +329,7 @@ app.get("/auth/session", async (req, res) => {
 app.post("/auth/signout", async (req, res) => {
   try {
     if (pool) {
-      const sid = getSessionIdFromReq(req);
+      const sid = req.signedCookies?.[SESSION_COOKIE_NAME] || req.cookies?.[SESSION_COOKIE_NAME];
       if (sid) await q("DELETE FROM sessions WHERE id=$1", [sid]).catch(() => {});
     }
     res.clearCookie(SESSION_COOKIE_NAME, cookieOptions(0));
@@ -443,9 +465,40 @@ async function pickSkuForCountry({ preferredSku, countryCode }) {
   return chosen;
 }
 
+/* === NEW: free-plan limit check helper === */
+async function assertWithinFreeLimit(userId) {
+  if (!userId) return; // anonymous users aren't counted/enforced
+  const plan = await getPlan(userId);
+  if (plan === "pro") return;
+
+  const { rows } = await q(
+    `SELECT COUNT(*)::int AS n
+     FROM generations
+     WHERE user_id=$1 AND created_at > NOW() - INTERVAL '1 day'`,
+    [userId]
+  );
+  const used = rows[0]?.n || 0;
+  if (used >= FREE_LIMIT) {
+    const resetIn = "24h";
+    const err = new Error(`Free limit reached (${FREE_LIMIT}/24h).`);
+    err.code = "FREE_LIMIT";
+    err.meta = { limit: FREE_LIMIT, used, window: resetIn };
+    throw err;
+  }
+}
+
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   const t0 = Date.now();
   try {
+    const user = await getAuthedUser(req); // === NEW
+    try { await assertWithinFreeLimit(user?.id); } // === NEW
+    catch (limitErr) {
+      if (limitErr?.code === "FREE_LIMIT") {
+        return res.status(429).json({ error: limitErr.message, ...limitErr.meta });
+      }
+      throw limitErr;
+    }
+
     if (!req.file) return res.status(400).json({ error: "No file uploaded (field name must be 'boatImage')." });
     if (!REPLICATE_API_TOKEN || !OPENAI_API_KEY) {
       return res.status(500).json({ error: "Missing API credentials (REPLICATE_API_TOKEN and/or OPENAI_API_KEY)." });
@@ -582,7 +635,7 @@ app.get("/images/list", async (req, res) => {
   }
 });
 
-// Poll prediction
+// Poll prediction  (logs a successful generation once)  === UPDATED
 app.get("/prediction-status/:id", async (req, res) => {
   try {
     const predictionId = req.params.id;
@@ -599,6 +652,20 @@ app.get("/prediction-status/:id", async (req, res) => {
         error: `Replicate status error ${statusResp.status}`,
         details: statusData || text?.slice(0, 800) || "No body",
       });
+    }
+
+    // === NEW: on first success, insert a generations row (idempotent via UNIQUE)
+    if (statusData?.status === "succeeded") {
+      const user = await getAuthedUser(req);
+      if (user) {
+        const mode = (req.query?.mode || "sticker").toString().toLowerCase() === "image" ? "image" : "sticker";
+        await q(
+          `INSERT INTO generations (user_id, mode, external_id)
+           VALUES ($1,$2,$3)
+           ON CONFLICT (user_id, external_id) DO NOTHING`,
+          [user.id, mode, predictionId]
+        ).catch(() => {}); // ignore duplicates/races
+      }
     }
 
     res.json(statusData);
@@ -794,12 +861,8 @@ async function start() {
   try {
     if (pool) {
       console.log("⛏️ Running DB migration…");
-      await q(MIGRATION_SQL); // <— BLOCK here until schema exists
-      // sanity check
-      await q("SELECT 1 FROM users LIMIT 1").catch(async () => {
-        // table may be empty; but ensure it exists
-        await q("SELECT to_regclass('public.users')");
-      });
+      await q(MIGRATION_SQL);
+      await q("SELECT to_regclass('public.users')");
       console.log("✅ Database schema is ready");
     }
 
@@ -807,9 +870,8 @@ async function start() {
     app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
   } catch (e) {
     console.error("❌ Failed to start server (migration?):", e);
-    process.exit(1); // fail fast so Render restarts the service
+    process.exit(1);
   }
 }
 
 start();
-
