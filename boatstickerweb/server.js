@@ -45,7 +45,7 @@ const {
   GOOTEN_STICKER_SKU,
 
   // === NEW: free plan throttling
-  FREE_DAILY_LIMIT = "3",   // default: 3 per 24h
+  FREE_DAILY_LIMIT = "1",   // default: 3 per 24h
 } = process.env;
 
 const FREE_LIMIT = Math.max(parseInt(FREE_DAILY_LIMIT, 10) || 3, 1);
@@ -977,5 +977,6 @@ async function start() {
 }
 
 start();
+
 
 
