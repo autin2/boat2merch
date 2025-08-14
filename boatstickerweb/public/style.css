@@ -407,7 +407,7 @@ header.site-header { background:#1e1e1e; border-bottom:1px solid #2a2a2a; positi
 .nav-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; }
 .brand { display:flex; align-items:center; gap:.5rem; font-weight:700; font-size:1.1rem; }
 .brand .logo-emoji { font-size:1.3rem; }
-.logo-img { display:block; width:24px; height:24px; border-radius:4px; }
+.logo-img { display:block; width:40px; height:40px; border-radius:4px; }
 nav.topnav a { color:#cfcfcf; text-decoration:none; margin-left:18px; position: relative; }
 
 /* Fancy active/hover underline that animates in */
@@ -718,3 +718,4 @@ header.site-header .container.nav-row {
   align-items: center;
   gap: 12px;
 }
+
