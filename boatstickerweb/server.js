@@ -30,6 +30,7 @@ const {
   // Stripe
   STRIPE_SECRET_KEY,
   STRIPE_WEBHOOK_SECRET,
+  STRIPE_PRO_MONTHLY_PRICE_ID, // <== NEW: your saved monthly price id (e.g. price_1Rw3AiRvHADeHspYs8gFlVgQ)
 
   // Email (optional; logs-only fallback if missing)
   SMTP_HOST,
@@ -154,6 +155,7 @@ if (SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS) {
 app.use("/images", express.static(path.join(process.cwd(), "src/public/images"), { maxAge: "7d" }));
 app.use(express.static("public"));
 app.use(cookieParser(SESSION_SECRET || undefined));
+// IMPORTANT: keep /webhook raw; everything else JSON
 app.use((req, res, next) => {
   if (req.originalUrl === "/webhook") return next();
   return express.json({ limit: "2mb" })(req, res, next);
@@ -747,7 +749,33 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
   return resp.json();
 }
 
-// Stripe: Checkout Session
+/* ============================
+   PRO SUBSCRIPTION CHECKOUT (NEW)
+   ============================ */
+app.post("/pro/checkout", async (req, res) => {
+  try {
+    const PRICE_ID = STRIPE_PRO_MONTHLY_PRICE_ID;
+    if (!PRICE_ID) {
+      return res.status(400).json({ error: "Missing STRIPE_PRO_MONTHLY_PRICE_ID" });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{ price: PRICE_ID, quantity: 1 }],
+      allow_promotion_codes: true,
+      customer_creation: "if_required",
+      success_url: `${(APP_ORIGIN || "").replace(/\/+$/,"")}/pricing.html?pro=ok`,
+      cancel_url: `${(APP_ORIGIN || "").replace(/\/+$/,"")}/pricing.html`,
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error("❌ /pro/checkout error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Stripe: One-time Sticker Checkout Session (kept)
 app.post("/create-checkout-session", async (req, res) => {
   try {
     const { email, imageUrl, name, address } = req.body;
@@ -782,7 +810,11 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// Stripe webhook -> Gooten order + email
+/* ============================
+   Stripe webhook:
+   - Handles PRO subscriptions (NEW)
+   - Keeps one-time orders working
+   ============================ */
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   const sig = req.headers["stripe-signature"];
   let event;
@@ -793,67 +825,120 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
+  try {
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
 
-    const buyerEmail = session.customer_details?.email || session.customer_email || "unknown";
-    const imageUrl = session.metadata?.imageUrl || "";
-    const buyerName = session.metadata?.buyerName || session.customer_details?.name || "Customer";
+      // (A) SUBSCRIPTION checkout finished => mark PRO
+      if (session.mode === "subscription") {
+        const subId = session.subscription;
+        const customerId = session.customer;
+        const email = session.customer_details?.email || session.customer_email || null;
 
-    const shipping =
-      session.shipping_details?.address ||
-      (() => {
-        try { return JSON.parse(session.metadata?.buyerAddress || "{}"); }
-        catch { return {}; }
-      })();
+        if (pool && email) {
+          try {
+            const u = await q(
+              "INSERT INTO users (email) VALUES ($1) ON CONFLICT (email) DO UPDATE SET email=EXCLUDED.email RETURNING id",
+              [email]
+            );
+            const userId = u.rows[0].id;
 
-    try {
-      const order = await submitGootenOrder({
-        imageUrl,
-        email: buyerEmail,
-        name: buyerName,
-        address: {
-          line1: shipping.line1,
-          line2: shipping.line2,
-          city: shipping.city,
-          state: shipping.state,
-          country: shipping.country,
-          postal_code: shipping.postal_code || shipping.zip,
-          phone: session.customer_details?.phone,
-        },
-        sourceId: session.id,
-      });
-      console.log("✅ Gooten order created:", order);
-    } catch (e) {
-      console.error("❌ Gooten order error:", e);
+            await q(`
+              INSERT INTO subscriptions (user_id, plan, status, stripe_customer_id, stripe_subscription_id, current_period_end)
+              VALUES ($1,'pro','active',$2,$3, to_timestamp(0))
+              ON CONFLICT (stripe_subscription_id) DO UPDATE
+              SET plan='pro', status='active', stripe_customer_id=$2, updated_at=now()
+            `, [userId, customerId, subId]);
+          } catch (e) {
+            console.error("❌ failed to upsert pro sub:", e);
+          }
+        }
+      }
+
+      // (B) ONE-TIME payment for sticker => create order + send email (existing flow)
+      if (session.mode === "payment") {
+        const buyerEmail = session.customer_details?.email || session.customer_email || "unknown";
+        const imageUrl = session.metadata?.imageUrl || "";
+        const buyerName = session.metadata?.buyerName || session.customer_details?.name || "Customer";
+
+        const shipping =
+          session.shipping_details?.address ||
+          (() => {
+            try { return JSON.parse(session.metadata?.buyerAddress || "{}"); }
+            catch { return {}; }
+          })();
+
+        try {
+          const order = await submitGootenOrder({
+            imageUrl,
+            email: buyerEmail,
+            name: buyerName,
+            address: {
+              line1: shipping.line1,
+              line2: shipping.line2,
+              city: shipping.city,
+              state: shipping.state,
+              country: shipping.country,
+              postal_code: shipping.postal_code || shipping.zip,
+              phone: session.customer_details?.phone,
+            },
+            sourceId: session.id,
+          });
+          console.log("✅ Gooten order created:", order);
+        } catch (e) {
+          console.error("❌ Gooten order error:", e);
+        }
+
+        try {
+          const emailHtml = `
+            <h2>New Sticker Order</h2>
+            <p><strong>Buyer Name:</strong> ${buyerName}</p>
+            <p><strong>Buyer Email:</strong> ${buyerEmail}</p>
+            <p><strong>Address:</strong><br/>
+              ${shipping.line1 || ""}<br/>
+              ${shipping.city || ""}, ${shipping.state || ""} ${shipping.postal_code || ""}<br/>
+              ${shipping.country || ""}
+            </p>
+            <p><strong>Sticker Image:</strong></p>
+            <img src="${imageUrl}" alt="Purchased Sticker" style="max-width:300px; border:1px solid #ccc; border-radius:6px;" />
+          `;
+          await transporter.sendMail({
+            from: SMTP_USER ? `"boat2merch" <${SMTP_USER}>` : "boat2merch@example.local",
+            to: "charliebrayton8@gmail.com",
+            subject: `New Sticker Order from ${buyerName}`,
+            html: emailHtml,
+          });
+          console.log("✅ Order email sent");
+        } catch (mailErr) {
+          console.error("❌ Error sending order email:", mailErr);
+        }
+      }
     }
 
-    try {
-      const emailHtml = `
-        <h2>New Sticker Order</h2>
-        <p><strong>Buyer Name:</strong> ${buyerName}</p>
-        <p><strong>Buyer Email:</strong> ${buyerEmail}</p>
-        <p><strong>Address:</strong><br/>
-          ${shipping.line1 || ""}<br/>
-          ${shipping.city || ""}, ${shipping.state || ""} ${shipping.postal_code || ""}<br/>
-          ${shipping.country || ""}
-        </p>
-        <p><strong>Sticker Image:</strong></p>
-        <img src="${imageUrl}" alt="Purchased Sticker" style="max-width:300px; border:1px solid #ccc; border-radius:6px;" />
-      `;
-      await transporter.sendMail({
-        from: SMTP_USER ? `"boat2merch" <${SMTP_USER}>` : "boat2merch@example.local",
-        to: "charliebrayton8@gmail.com",
-        subject: `New Sticker Order from ${buyerName}`,
-        html: emailHtml,
-      });
-      console.log("✅ Order email sent");
-    } catch (mailErr) {
-      console.error("❌ Error sending order email:", mailErr);
+    // Keep subscription lifecycle in sync
+    if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated") {
+      const sub = event.data.object;
+      await q(`
+        UPDATE subscriptions
+        SET status=$1, current_period_end = to_timestamp($2), updated_at=now()
+        WHERE stripe_subscription_id=$3
+      `, [sub.status, Math.floor(sub.current_period_end || 0), sub.id]).catch(()=>{});
     }
+
+    if (event.type === "customer.subscription.deleted") {
+      const sub = event.data.object;
+      await q(`
+        UPDATE subscriptions
+        SET status='canceled', updated_at=now()
+        WHERE stripe_subscription_id=$1
+      `, [sub.id]).catch(()=>{});
+    }
+
+    res.json({ received: true });
+  } catch (err) {
+    console.error("❌ Webhook handler error:", err);
+    res.status(500).send("Webhook processing failed");
   }
-
-  res.json({ received: true });
 });
 
 // ---------- BOOT: run migration, then start server ----------
