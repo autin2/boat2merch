@@ -11,6 +11,7 @@
   <!-- Favicon / App Icon -->
   <link rel="icon" type="image/png" sizes="32x32" href="/images/icon.png?v=3">
   <link rel="stylesheet" href="style.css" />
+
   <style>
     /* Local tweaks so buttons sit nicely under the text */
     .hero .lead-wrap { max-width: 560px; }
@@ -19,33 +20,6 @@
 
     /* ---------- Free-tier limit modal (self-contained styles) ---------- */
     .hidden { display: none !important; }
-
-    /* Right rail to hold sub badge + account pill on far right */
-    .right-rail { display:flex; align-items:center; gap:12px; margin-left: auto; }
-
-    /* Subscription badge */
-    .sub-badge {
-      display:inline-flex; align-items:center; justify-content:center;
-      font-weight: 900; letter-spacing: .4px; text-transform: uppercase;
-      padding: 6px 10px; border-radius: 999px; font-size: .78rem;
-      border: 1px solid #2e2e2e; background:#1f1f1f; color:#d0d0d0;
-      box-shadow: 0 0 0 1px rgba(255,255,255,.03) inset;
-      min-width: 54px;
-    }
-    .sub-badge.pro {
-      color:#121212;
-      background:
-        linear-gradient(180deg, #ffd992 0%, #ffad33 55%, #ff8b00 100%);
-      border-color: rgba(255,152,0,.7);
-      box-shadow:
-        0 0 16px rgba(255,172,28,.35),
-        0 6px 18px rgba(0,0,0,.35),
-        0 0 0 1px rgba(255,255,255,.06) inset;
-      text-shadow: 0 1px 0 rgba(255,255,255,.35);
-    }
-    .sub-badge.free {
-      background:#202020; color:#cfcfcf; border-color:#2e2e2e;
-    }
 
     .limit-modal {
       position: fixed; inset: 0;
@@ -87,8 +61,12 @@
       display: grid; grid-template-columns: 1fr; gap: 18px;
     }
 
-    .limit-hero { display: flex; flex-direction: column; gap: 10px; }
-    .limit-hero h2 { margin: 0; font-size: clamp(1.2rem, 2.6vw, 1.6rem); }
+    .limit-hero {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .limit-hero h2 {
+      margin: 0; font-size: clamp(1.2rem, 2.6vw, 1.6rem);
+    }
     .limit-hero p { margin: 0; color: #cfcfcf; }
 
     .limit-feats {
@@ -99,7 +77,9 @@
     .limit-feats ul { margin: 0; padding: 0 0 0 18px; color: #cfcfcf; }
     .limit-feats li { margin: 6px 0; }
 
-    .limit-cta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .limit-cta {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px;
+    }
     .limit-price {
       display: inline-flex; align-items: baseline; gap: 8px;
       padding: 10px 12px; border-radius: 12px; background: #222; border: 1px solid #333; color: #ffb347;
@@ -107,7 +87,9 @@
     }
     .limit-price small { color: #bbb; font-weight: 600; }
 
-    .limit-safe { display: flex; align-items: center; gap: 10px; color: #aaa; font-size: 13px; }
+    .limit-safe {
+      display: flex; align-items: center; gap: 10px; color: #aaa; font-size: 13px;
+    }
     .limit-safe svg { opacity: .8; }
 
     .btn-pro {
@@ -118,17 +100,52 @@
     .btn-pro:hover { transform: translateY(-1px); box-shadow: 0 14px 26px rgba(255,152,0,.45); }
     .btn-ghost.dim { background:#232323; border:1px solid #333; color:#ddd; }
     .btn-ghost.dim:hover { background:#2a2a2a; }
+
+    /* ---------- RIGHT-SIDE account area (badge + auth pill) ---------- */
+    .account-area {
+      margin-left: auto;              /* push to the far right */
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .plan-badge {
+      font-weight: 800;
+      font-size: .9rem;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #2a2a2a;
+      color: #cfcfcf;
+      border: 1px solid #353535;
+      letter-spacing: .3px;
+    }
+    .plan-badge.pro {
+      background: linear-gradient(135deg,#ffcc33,#ff9800);
+      color: #121212;
+      box-shadow: 0 0 10px rgba(255,152,0,.55), 0 0 22px rgba(255,152,0,.28);
+      border-color: rgba(255,200,80,.6);
+    }
+
+    /* Make the signed-in pill match your existing style but compact */
+    .signed-in-pill {
+      display:flex; align-items:center; gap:8px;
+      background:#202020; border:1px solid #2e2e2e; border-radius:999px; padding:6px 10px;
+    }
+    .signed-in-pill .email {
+      white-space: nowrap; max-width: 26ch; overflow: hidden; text-overflow: ellipsis;
+      color: #eaeaea; font-size: .9rem;
+    }
+    .btn.tiny { padding:6px 10px; border-radius:8px; font-size:.8rem; }
   </style>
 </head>
 <body>
   <!-- Header -->
   <header class="site-header">
     <div class="container nav-row">
+      <!-- Left group: brand + nav -->
       <div class="brand">
         <img src="/images/icon.png" class="logo-img" alt="" width="24" height="24" />
         <span>Boat2Merch</span>
       </div>
-
       <nav class="topnav" aria-label="Primary">
         <a href="index.html" class="active">Home</a>
         <a href="how-it-works.html">How It Works</a>
@@ -137,15 +154,17 @@
         <a href="contact.html">Contact</a>
       </nav>
 
-      <!-- RIGHT RAIL: sub badge + account pill (far right) -->
-      <div class="right-rail">
-        <div id="subBadge" class="sub-badge free" aria-live="polite">FREE</div>
-        <div class="account-slot">
-          <button id="signinBtn" class="btn btn-ghost small">Sign in</button>
-          <div id="userPill" class="signed-in-pill hidden">
-            <span id="userEmail"></span>
-            <button id="signoutBtn" class="btn btn-ghost tiny">Sign out</button>
-          </div>
+      <!-- Right group: plan badge + auth pill/sign-in -->
+      <div class="account-area">
+        <span id="planBadge" class="plan-badge">FREE</span>
+
+        <!-- Sign in button (shown when logged out) -->
+        <button id="signinBtn" class="btn btn-ghost small">Sign in</button>
+
+        <!-- Signed-in pill (shown when logged in) -->
+        <div id="userPill" class="signed-in-pill hidden">
+          <span id="userEmail" class="email"></span>
+          <button id="signoutBtn" class="btn btn-ghost tiny">Sign out</button>
         </div>
       </div>
     </div>
@@ -313,12 +332,12 @@
     const gate = document.getElementById("gate");
     const gateSignIn = document.getElementById("gateSignIn");
 
-    // Auth widgets
+    // Right-side account widgets
     const signinBtn = document.getElementById("signinBtn");
     const userPill = document.getElementById("userPill");
     const userEmailEl = document.getElementById("userEmail");
     const signoutBtn = document.getElementById("signoutBtn");
-    const subBadge = document.getElementById("subBadge");
+    const planBadge = document.getElementById("planBadge");
 
     const authModal = document.getElementById("authModal");
     const authClose = document.getElementById("authClose");
@@ -375,12 +394,34 @@
     }
     function setPlanBadge(plan) {
       const p = (plan || "free").toLowerCase();
-      subBadge.textContent = p === "pro" ? "PRO" : "FREE";
-      subBadge.classList.toggle("pro", p === "pro");
-      subBadge.classList.toggle("free", p !== "pro");
+      if (p === "pro") {
+        planBadge.textContent = "PRO";
+        planBadge.classList.add("pro");
+      } else {
+        planBadge.textContent = "FREE";
+        planBadge.classList.remove("pro");
+      }
     }
-    function showLimitModal() { limitModal.classList.remove("hidden"); }
-    function hideLimitModal() { limitModal.classList.add("hidden"); }
+    function showLimitModal() {
+      limitModal.classList.remove("hidden");
+    }
+    function hideLimitModal() {
+      limitModal.classList.add("hidden");
+    }
+
+    async function checkSession() {
+      try {
+        const { ok, json } = await fetchJSON("/auth/session");
+        if (ok && json && json.user && json.user.email) {
+          setAuthedState(json.user.email);
+        } else {
+          setAuthedState(null);
+        }
+      } catch {
+        signinBtn.classList.add("hidden");
+        userPill.classList.add("hidden");
+      }
+    }
 
     async function checkPlan() {
       try {
@@ -391,24 +432,6 @@
           setPlanBadge("free");
         }
       } catch {
-        setPlanBadge("free");
-      }
-    }
-
-    async function checkSession() {
-      try {
-        const { ok, json } = await fetchJSON("/auth/session");
-        if (ok && json && json.user && json.user.email) {
-          setAuthedState(json.user.email);
-          await checkPlan();
-        } else {
-          setAuthedState(null);
-          setPlanBadge("free");
-        }
-      } catch {
-        // If session endpoint doesn't exist yet, just hide the UI but keep app usable
-        signinBtn.classList.add("hidden");
-        userPill.classList.add("hidden");
         setPlanBadge("free");
       }
     }
@@ -523,7 +546,6 @@
           attempts++;
           const resp = await fetch(`/prediction-status/${predictionId}?mode=${currentMode}`);
 
-          // If rate-limited mid-flight (e.g., we counted this attempt), show Pro modal.
           if (resp.status === 429) {
             statusArea.innerHTML = "";
             showLimitModal();
@@ -582,22 +604,17 @@
       }
     });
 
-    // Kick off session check on load
-    checkSession();
+    // Kick off session + plan checks on load
+    checkSession().then(checkPlan);
 
     // If you redirect back after magic link verify with ?login=ok
     if (new URLSearchParams(location.search).get("login") === "ok") {
       showToast("You're signed in!");
-      // Clean the URL
       const url = new URL(location.href);
       url.searchParams.delete("login");
       history.replaceState({}, "", url);
-      checkSession();
-    }
-
-    // If you redirect back after Stripe with ?pro=ok (from pricing.html), refresh plan
-    if (new URLSearchParams(location.search).get("pro") === "ok") {
-      checkPlan();
+      // Refresh both session + plan
+      checkSession().then(checkPlan);
     }
   </script>
 </body>
