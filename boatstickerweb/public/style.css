@@ -465,31 +465,26 @@ nav.topnav a.active::after { width:100%; }
 .btn:active { transform: translateY(1px) scale(.995); }
 .btn:focus-visible { outline: 2px solid #ff9800; outline-offset: 2px; }
 
-/* Primary / ghost variants with lift on hover */
 .btn-primary { background:#ff9800; color:#121212; }
 .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(255,152,0,.35); }
 
 .btn-ghost { background:#2a2a2a; color:#eaeaea; border:1px solid #3a3a3a; }
 .btn-ghost:hover { transform: translateY(-1px); box-shadow: 0 8px 16px rgba(0,0,0,.35); }
 
-/* Button spacing fix */
 .controls { gap: 10px; justify-content: center; }
 .controls .btn { min-width: 160px; flex: 0 1 auto; }
 
-/* Blue secondary specifically inside the controls row */
 .controls .btn-secondary {
   background:#03a9f4; color:#121212; margin-top:0;
 }
 .controls .btn-secondary:hover { background:#0288d1; transform: translateY(-1px); box-shadow: 0 8px 18px rgba(2,136,209,.35); }
 
-/* Transparent action area (no big box behind buttons) */
 .action-card { padding: 0; background: transparent; border: 0; box-shadow: none; }
 .action-card .controls {
   position: relative;
   padding: 6px 8px;
 }
 
-/* Subtle "offset plate" under the buttons for looks */
 .action-card .controls::before {
   content: "";
   position: absolute;
@@ -520,24 +515,20 @@ nav.topnav a.active::after { width:100%; }
 #editBtn { visibility:hidden; }
 #editBtn.visible { visibility:visible; }
 
-/* How It Works page spacing fix */
 section .card.pad {
   margin-bottom: 24px;
 }
 
-/* Reduce motion preference */
 @media (prefers-reduced-motion: reduce) {
   .btn, .card, nav.topnav a::after { transition: none; }
 }
 
-/* --- Account pill + small buttons --- */
 .account-slot { display:flex; align-items:center; gap:10px; }
 .btn.small { padding:8px 12px; border-radius:8px; font-size:.9rem; }
 .btn.tiny { padding:6px 10px; border-radius:8px; font-size:.8rem; }
 .signed-in-pill { display:flex; align-items:center; gap:8px; background:#202020; border:1px solid #2e2e2e; border-radius:999px; padding:6px 10px; }
 .hidden { display:none !important; }
 
-/* --- Result gate (blur overlay until signed in) --- */
 .result-wrap { position: relative; }
 .gate {
   position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -552,7 +543,6 @@ section .card.pad {
 }
 .gate-box h3 { margin:0 0 6px; }
 
-/* --- Auth modal --- */
 .auth-modal {
   position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
   background: rgba(0,0,0,.55); z-index: 1000;
@@ -571,13 +561,30 @@ section .card.pad {
 #authForm input[type="email"] {
   flex:1; background:#2a2a2a; border:1px solid #3a3a3a; color:#eaeaea; padding:10px 12px; border-radius:8px;
 }
-.sr-only { position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+
+.sr-only { 
+  position: absolute !important; 
+  width: 1px; 
+  height: 1px; 
+  padding: 0; 
+  margin: -1px; 
+  overflow: hidden; 
+  clip: rect(0,0,0,0); 
+  border: 0; 
+}
 
 /* --- Toast --- */
 .toast {
-  position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: 22px; background: #222; color: #fff; padding: 10px 14px;
-  border: 1px solid #333; border-radius: 10px; z-index: 1100;
+  position: fixed; 
+  left: 50%; 
+  transform: translateX(-50%);
+  bottom: 22px; 
+  background: #222; 
+  color: #fff; 
+  padding: 10px 14px;
+  border: 1px solid #333; 
+  border-radius: 10px; 
+  z-index: 1100;
 }
 
 /* ==== PRO LIMIT MODAL (alt theme: may be unused but safe) ==== */
@@ -687,4 +694,27 @@ nav.topnav {
     0 0 12px rgba(255,153,0,.45),
     0 0 1px 1px rgba(255,255,255,.06) inset;
   text-shadow: 0 1px 0 rgba(255,255,255,.25);
+}
+
+/* ==== ADDED FULL-WIDTH HEADER + ACCOUNT AREA CHANGES ==== */
+header.site-header .container.nav-row {
+  max-width: none;
+  width: 100%;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.nav-row {
+  justify-content: flex-start;
+}
+
+.topnav {
+  margin-left: 20px;
+}
+
+.account-area {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
