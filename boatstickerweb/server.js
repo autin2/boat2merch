@@ -522,7 +522,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
 
     const prompt = isSticker
       ? "Create a clean, high-contrast black and white line drawing of the boat shown in the input image, with a thick white contour outline around the entire boat so it looks like a die-cut sticker. Transparent background. Include the entire boat with a small margin; do not crop or cut off any part. No extra elements, no shadows."
-      : "Create a clean, high-contrast black-and-white line drawing of the boat in the input image. The background must be 100% solid white. Capture the entire boat in full, with a small, even margin around all sides. Absolutely no cropping, cutting off, or omitting any part of the boat — all edges, tips, and features must be fully visible. Do not add extra elements, shadows, artistic effects, or stylization; only include a precise, accurate outline and the main structural details of the boat.";
+      : "Create a clean black-and-white line drawing of the boat in the input image, on a solid white background. Show the entire boat with a small margin — no cropping or cutting off any part. No extra elements, shadows, or effects; only the outline and main details.";
 
     const backgroundSetting = isSticker ? "transparent" : "opaque";
 
@@ -977,6 +977,7 @@ async function start() {
 }
 
 start();
+
 
 
 
