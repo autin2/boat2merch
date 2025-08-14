@@ -57,7 +57,8 @@
 
     .limit-body {
       padding: 18px 18px 8px 18px;
-      display: grid; grid-template-columns: 1.2fr .9fr; gap: 18px;
+      /* Collapsed to a single column since samples are removed */
+      display: grid; grid-template-columns: 1fr; gap: 18px;
     }
     @media (max-width: 820px) {
       .limit-body { grid-template-columns: 1fr; }
@@ -89,6 +90,7 @@
     }
     .limit-price small { color: #bbb; font-weight: 600; }
 
+    /* (Unused now, but safe to keep) */
     .limit-sample {
       background: #111; border-left: 1px solid #2a2a2a;
       padding: 14px;
@@ -286,8 +288,7 @@
             <span>Secure checkout via Stripe. Cancel anytime.</span>
           </div>
         </div>
-
-        
+        <!-- No .limit-sample column -->
       </div>
     </div>
   </div>
@@ -562,4 +563,3 @@
   </script>
 </body>
 </html>
-
