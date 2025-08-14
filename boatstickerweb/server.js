@@ -30,7 +30,7 @@ const {
   // Stripe
   STRIPE_SECRET_KEY,
   STRIPE_WEBHOOK_SECRET,
-  STRIPE_PRO_MONTHLY_PRICE_ID, // <== NEW: your saved monthly price id (e.g. price_1Rw3AiRvHADeHspYs8gFlVgQ)
+  STRIPE_PRICE_PRO_MONTHLY, // <-- UPDATED: use this env var name
 
   // Email (optional; logs-only fallback if missing)
   SMTP_HOST,
@@ -48,7 +48,7 @@ const {
   FREE_DAILY_LIMIT = "3",   // default: 3 per 24h
 } = process.env;
 
-const FREE_LIMIT = Math.max(parseInt(FREE_DAILY_LIMIT, 10) || 3, 1); // === NEW
+const FREE_LIMIT = Math.max(parseInt(FREE_DAILY_LIMIT, 10) || 3, 1);
 const isProd = process.env.NODE_ENV === "production";
 
 // ---------- DB pool ----------
@@ -57,7 +57,7 @@ let q = async () => { throw new Error("Database is not configured"); };
 if (DATABASE_URL) {
   pool = new Pool({
     connectionString: DATABASE_URL,
-    ssl: { rejectUnauthorized: false }, // Render PG usually requires SSL
+    ssl: { rejectUnauthorized: false },
   });
   q = (text, params) => pool.query(text, params);
 } else {
@@ -161,7 +161,7 @@ app.use((req, res, next) => {
   return express.json({ limit: "2mb" })(req, res, next);
 });
 
-// Health (Render can use this)
+// Health
 app.get("/healthz", async (_req, res) => {
   try {
     if (!pool) return res.status(200).send("ok (no-db)");
@@ -173,9 +173,9 @@ app.get("/healthz", async (_req, res) => {
 });
 
 /* ============================
-   AUTH helpers (NEW)
+   AUTH helpers
    ============================ */
-async function getAuthedUser(req) { // === NEW
+async function getAuthedUser(req) {
   if (!pool) return null;
   const sid = req.signedCookies?.[SESSION_COOKIE_NAME] || req.cookies?.[SESSION_COOKIE_NAME];
   if (!sid) return null;
@@ -191,7 +191,7 @@ async function getAuthedUser(req) { // === NEW
   return rows[0] || null;
 }
 
-async function getPlan(userId) { // === NEW
+async function getPlan(userId) {
   if (!pool || !userId) return "free";
   const { rows } = await q(
     `SELECT plan, status
@@ -492,8 +492,8 @@ async function assertWithinFreeLimit(userId) {
 app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
   const t0 = Date.now();
   try {
-    const user = await getAuthedUser(req); // === NEW
-    try { await assertWithinFreeLimit(user?.id); } // === NEW
+    const user = await getAuthedUser(req);
+    try { await assertWithinFreeLimit(user?.id); }
     catch (limitErr) {
       if (limitErr?.code === "FREE_LIMIT") {
         return res.status(429).json({ error: limitErr.message, ...limitErr.meta });
@@ -637,7 +637,7 @@ app.get("/images/list", async (req, res) => {
   }
 });
 
-// Poll prediction  (logs a successful generation once)  === UPDATED
+// Poll prediction (logs once)
 app.get("/prediction-status/:id", async (req, res) => {
   try {
     const predictionId = req.params.id;
@@ -656,7 +656,6 @@ app.get("/prediction-status/:id", async (req, res) => {
       });
     }
 
-    // === NEW: on first success, insert a generations row (idempotent via UNIQUE)
     if (statusData?.status === "succeeded") {
       const user = await getAuthedUser(req);
       if (user) {
@@ -666,7 +665,7 @@ app.get("/prediction-status/:id", async (req, res) => {
            VALUES ($1,$2,$3)
            ON CONFLICT (user_id, external_id) DO NOTHING`,
           [user.id, mode, predictionId]
-        ).catch(() => {}); // ignore duplicates/races
+        ).catch(() => {});
       }
     }
 
@@ -750,13 +749,13 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
 }
 
 /* ============================
-   PRO SUBSCRIPTION CHECKOUT (NEW)
+   PRO SUBSCRIPTION CHECKOUT
    ============================ */
-app.post("/pro/checkout", async (req, res) => {
+app.post("/pro/checkout", async (_req, res) => {
   try {
-    const PRICE_ID = STRIPE_PRO_MONTHLY_PRICE_ID;
+    const PRICE_ID = STRIPE_PRICE_PRO_MONTHLY; // <-- UPDATED reference
     if (!PRICE_ID) {
-      return res.status(400).json({ error: "Missing STRIPE_PRO_MONTHLY_PRICE_ID" });
+      return res.status(400).json({ error: "Missing STRIPE_PRICE_PRO_MONTHLY" });
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -812,7 +811,7 @@ app.post("/create-checkout-session", async (req, res) => {
 
 /* ============================
    Stripe webhook:
-   - Handles PRO subscriptions (NEW)
+   - Handles PRO subscriptions
    - Keeps one-time orders working
    ============================ */
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
@@ -855,7 +854,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
         }
       }
 
-      // (B) ONE-TIME payment for sticker => create order + send email (existing flow)
+      // (B) ONE-TIME payment for sticker => create order + send email
       if (session.mode === "payment") {
         const buyerEmail = session.customer_details?.email || session.customer_email || "unknown";
         const imageUrl = session.metadata?.imageUrl || "";
@@ -941,7 +940,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
   }
 });
 
-// ---------- BOOT: run migration, then start server ----------
+// ---------- BOOT ----------
 async function start() {
   try {
     if (pool) {
