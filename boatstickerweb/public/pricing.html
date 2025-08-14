@@ -22,7 +22,7 @@
     .plan { transition: transform .2s ease, box-shadow .2s ease; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
     .plan:hover { transform: translateY(-6px); box-shadow: 0 14px 36px rgba(0,0,0,.35); }
 
-    /* Featured ($10) card with subtle gradient border */
+    /* Featured card with subtle gradient border */
     .plan.featured {
       border: 2px solid transparent;
       background:
@@ -41,7 +41,6 @@
       z-index: 3;
       pointer-events: none;
     }
-    /* Front band */
     .ribbon .band {
       display: inline-block;
       padding: 10px 72px;
@@ -57,7 +56,6 @@
         0 10px 22px rgba(0,0,0,.35);
       position: relative;
     }
-    /* Inner gloss */
     .ribbon .band::after {
       content:"";
       position:absolute; inset: 2px 6px;
@@ -66,18 +64,16 @@
         linear-gradient(0deg, rgba(0,0,0,.12), transparent 20%);
       clip-path: inherit;
     }
-    /* Back wrap shadow (appears behind card corners) */
     .ribbon::before {
       content:"";
       position:absolute;
-      inset: 12px -80px 12px -80px; /* extend behind */
+      inset: 12px -80px 12px -80px;
       background: radial-gradient(80% 60% at 50% 50%, rgba(0,0,0,.35), rgba(0,0,0,0) 70%);
       transform: rotate(calc(var(--angle) * -1));
-      z-index: -1; /* behind the card due to isolation */
+      z-index: -1;
       filter: blur(6px);
       opacity:.6;
     }
-    /* Folded tails on edges */
     .ribbon .tail-left,
     .ribbon .tail-right {
       position: absolute; top: 50%; width: 16px; height: 18px; transform: translateY(-50%);
@@ -102,6 +98,9 @@
     /* Simple FAQ grid */
     .faq-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
     @media (max-width: 900px) { .faq-grid { grid-template-columns: 1fr; } }
+
+    /* Tiny toast (reuses .toast class base if present) */
+    .toast { min-width: 240px; text-align:center; }
   </style>
 </head>
 <body>
@@ -110,7 +109,7 @@
     <div class="container nav-row">
       <div class="brand">
         <img src="/images/icon.png" class="logo-img" alt="" width="24" height="24" />
-        <span>Boat2Merch</span>
+      <span>Boat2Merch</span>
       </div>
       <nav class="topnav" aria-label="Primary">
         <a href="index.html">Home</a>
@@ -145,9 +144,8 @@
         <button class="btn-secondary" onclick="location.href='index.html'">Get Started</button>
       </div>
 
-      <!-- $10 / month (featured) -->
+      <!-- Pro ($7/mo) -->
       <div class="plan featured card pad">
-        <!-- Wrap-around ribbon -->
         <div class="ribbon" aria-hidden="true">
           <span class="tail-left"></span>
           <span class="band">BEST VALUE</span>
@@ -163,7 +161,8 @@
           <li>Full commercial/print rights</li>
           <li>Priority support</li>
         </ul>
-        <button class="btn-primary" onclick="location.href='index.html'">Upgrade Now</button>
+        <button id="goProBtn" class="btn-primary">Upgrade Now</button>
+        <p id="proNote" class="muted" style="margin-top:10px;"></p>
       </div>
 
     </div>
@@ -207,6 +206,114 @@
     </div>
   </footer>
 
+  <!-- Minimal sign-in modal (same pattern as index) -->
+  <div id="authModal" class="auth-modal hidden" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="auth-card">
+      <button class="auth-close" id="authClose" aria-label="Close">×</button>
+      <h2 id="authTitle" style="margin:0 0 8px;">Sign in</h2>
+      <p class="muted" style="margin:0 0 14px;">We’ll email you a secure link. No password needed.</p>
+      <form id="authForm">
+        <label for="authEmail" class="sr-only">Email</label>
+        <input type="email" id="authEmail" placeholder="you@example.com" required />
+        <button type="submit" class="btn btn-primary" id="authSubmit">Send magic link</button>
+      </form>
+      <div id="authNote" class="muted tiny" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- Tiny toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script>
+    // --- tiny helpers ---
+    const toast = document.getElementById("toast");
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.remove("hidden");
+      setTimeout(() => toast.classList.add("hidden"), 2600);
+    }
+    async function fetchJSON(url, opts) {
+      const r = await fetch(url, opts);
+      const t = await r.text();
+      try { return { ok: r.ok, status: r.status, json: JSON.parse(t) }; }
+      catch { return { ok: r.ok, status: r.status, json: t }; }
+    }
+
+    // --- auth modal wiring (mirrors index) ---
+    const authModal = document.getElementById("authModal");
+    const authClose = document.getElementById("authClose");
+    const authForm = document.getElementById("authForm");
+    const authEmail = document.getElementById("authEmail");
+    const authSubmit = document.getElementById("authSubmit");
+    const authNote = document.getElementById("authNote");
+
+    function openAuth() {
+      authModal.classList.remove("hidden");
+      setTimeout(() => authEmail.focus(), 0);
+    }
+    function closeAuth() {
+      authModal.classList.add("hidden");
+      authForm.reset();
+      authNote.textContent = "";
+    }
+    authClose?.addEventListener("click", closeAuth);
+    authModal?.addEventListener("click", (e) => { if (e.target === authModal) closeAuth(); });
+    authForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = authEmail.value.trim();
+      if (!email) return;
+      authSubmit.disabled = true;
+      authSubmit.textContent = "Sending…";
+      authNote.textContent = "";
+      const { ok, json } = await fetchJSON("/auth/send-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      authSubmit.disabled = false;
+      authSubmit.textContent = "Send magic link";
+      if (ok) { authNote.textContent = "Check your email for the sign-in link."; }
+      else { authNote.textContent = (json && json.error) ? json.error : "Could not send link right now."; }
+    });
+
+    // --- Upgrade button: call /pro/checkout and handle responses ---
+    const proBtn = document.getElementById("goProBtn");
+    const proNote = document.getElementById("proNote");
+
+    proBtn?.addEventListener("click", async () => {
+      proBtn.disabled = true;
+      proBtn.textContent = "Preparing checkout…";
+      proNote.textContent = "";
+      try {
+        const { ok, status, json } = await fetchJSON("/pro/checkout", { method: "POST", headers: { "Content-Type": "application/json" }});
+        if (ok && json?.url) {
+          window.location.href = json.url;
+          return;
+        }
+        if (status === 401 || json?.error === "NOT_SIGNED_IN") {
+          // Ask user to sign in; after magic link, they can click Upgrade again
+          openAuth();
+          showToast("Please sign in to upgrade.");
+          return;
+        }
+        // Surface server error to help debug
+        proNote.textContent = "Checkout error: " + (json?.error || status);
+        showToast("Checkout error");
+      } catch (e) {
+        proNote.textContent = "Unexpected error: " + e.message;
+      } finally {
+        proBtn.disabled = false;
+        proBtn.textContent = "Upgrade Now";
+      }
+    });
+
+    // Optional: show a toast if they returned from success
+    if (new URLSearchParams(location.search).get("pro") === "ok") {
+      showToast("Thanks! Your Pro is active shortly.");
+      const url = new URL(location.href);
+      url.searchParams.delete("pro");
+      history.replaceState({}, "", url);
+    }
+  </script>
 </body>
 </html>
-
