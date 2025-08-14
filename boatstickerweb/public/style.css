@@ -777,3 +777,7 @@ section .card.pad {
   background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08);
   color: #cfcfcf;
 }
+
+.limit-sample:empty {
+  display: none;
+}
