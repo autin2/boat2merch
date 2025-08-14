@@ -751,18 +751,24 @@ async function submitGootenOrder({ imageUrl, email, name, address, sourceId }) {
 /* ============================
    PRO SUBSCRIPTION CHECKOUT
    ============================ */
-app.post("/pro/checkout", async (_req, res) => {
+app.post("/pro/checkout", async (req, res) => {
   try {
-    const PRICE_ID = STRIPE_PRICE_PRO_MONTHLY; // <-- UPDATED reference
+    const PRICE_ID = process.env.STRIPE_PRICE_PRO_MONTHLY; // uses your env var
     if (!PRICE_ID) {
       return res.status(400).json({ error: "Missing STRIPE_PRICE_PRO_MONTHLY" });
     }
+
+    // If you have auth, attach the email so Stripe creates/links a Customer automatically
+    const user = await getAuthedUser(req).catch(() => null);
+    const customerEmail = user?.email || undefined;
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: PRICE_ID, quantity: 1 }],
       allow_promotion_codes: true,
-      customer_creation: "if_required",
+      // ❌ remove customer_creation (only valid in payment mode)
+      // customer_creation: "if_required",
+      ...(customerEmail ? { customer_email: customerEmail } : {}),
       success_url: `${(APP_ORIGIN || "").replace(/\/+$/,"")}/pricing.html?pro=ok`,
       cancel_url: `${(APP_ORIGIN || "").replace(/\/+$/,"")}/pricing.html`,
     });
@@ -773,6 +779,7 @@ app.post("/pro/checkout", async (_req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // Stripe: One-time Sticker Checkout Session (kept)
 app.post("/create-checkout-session", async (req, res) => {
@@ -959,3 +966,4 @@ async function start() {
 }
 
 start();
+
