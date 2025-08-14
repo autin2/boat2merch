@@ -185,7 +185,6 @@
         <div class="controls">
           <button class="btn btn-primary btn-generate" id="btnImage">Generate an Image</button>
           <button class="btn btn-secondary btn-generate" id="btnSticker">Generate a Sticker</button>
-          <button class="btn btn-ghost" id="editBtn">Buy as a sticker</button>
         </div>
 
         <!-- Status -->
@@ -208,7 +207,6 @@
           </div>
           <div class="btn-row">
             <a id="downloadBtn" class="btn btn-ghost" download="boat-ai-design.png" aria-disabled="true">Download</a>
-            <button id="buyBtn" class="btn btn-secondary" aria-disabled="true">Buy as a sticker</button>
           </div>
         </div>
       </div>
@@ -323,12 +321,10 @@
     const boatUpload = document.getElementById("boatUpload");
     const btnImage = document.getElementById("btnImage");
     const btnSticker = document.getElementById("btnSticker");
-    const editBtn = document.getElementById("editBtn");
     const statusArea = document.getElementById("statusArea");
     const resultPanel = document.getElementById("resultPanel");
     const resultImage = document.getElementById("resultImage");
     const downloadBtn = document.getElementById("downloadBtn");
-    const buyBtn = document.getElementById("buyBtn");
     const gate = document.getElementById("gate");
     const gateSignIn = document.getElementById("gateSignIn");
 
@@ -385,7 +381,6 @@
         userEmailEl.textContent = email;
         gate.classList.add("hidden");
         downloadBtn.removeAttribute("aria-disabled");
-        buyBtn.removeAttribute("aria-disabled");
       } else {
         signinBtn.classList.remove("hidden");
         userPill.classList.add("hidden");
@@ -506,7 +501,6 @@
 
       // Reset UI
       resultPanel.style.display = "none";
-      editBtn.classList.remove("visible");
       statusArea.innerHTML = `
         <div class="loading-container">
           <div class="spinner" aria-hidden="true"></div>
@@ -566,23 +560,12 @@
             if (!isAuthed) {
               gate.classList.remove("hidden");
               downloadBtn.setAttribute("aria-disabled", "true");
-              buyBtn.setAttribute("aria-disabled", "true");
               downloadBtn.removeAttribute("href");
             } else {
               gate.classList.add("hidden");
               downloadBtn.href = imageUrl;
               downloadBtn.removeAttribute("aria-disabled");
-              buyBtn.removeAttribute("aria-disabled");
             }
-
-            // CTA buttons
-            editBtn.classList.add("visible");
-            const goBuy = () => {
-              if (!isAuthed) { openAuth(); return; }
-              window.location.href = "buy.html?img=" + encodeURIComponent(imageUrl);
-            };
-            editBtn.onclick = goBuy;
-            buyBtn.onclick = goBuy;
 
           } else if (statusData.status === "failed") {
             statusArea.innerHTML = `<div class="card pad" style="border-color:#733;">Generation failed. Please try a different photo.</div>`;
@@ -619,4 +602,3 @@
   </script>
 </body>
 </html>
-
