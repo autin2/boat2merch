@@ -161,6 +161,17 @@ app.use((req, res, next) => {
   return express.json({ limit: "2mb" })(req, res, next);
 });
 
+
+app.get("/me/plan", async (req, res) => {
+  try {
+    const user = await getAuthedUser(req);
+    const plan = await getPlan(user?.id);
+    res.json({ plan });
+  } catch { res.json({ plan: "free" }); }
+});
+
+
+
 // Health
 app.get("/healthz", async (_req, res) => {
   try {
@@ -966,4 +977,5 @@ async function start() {
 }
 
 start();
+
 
