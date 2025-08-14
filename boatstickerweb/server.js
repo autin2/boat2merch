@@ -31,7 +31,7 @@ const {
   STRIPE_SECRET_KEY,
   STRIPE_WEBHOOK_SECRET,
 
-  // Email
+  // Email (optional; falls back to console transport if missing)
   SMTP_HOST,
   SMTP_PORT,
   SMTP_USER,
@@ -50,9 +50,11 @@ const isProd = process.env.NODE_ENV === "production";
 
 // Create a pool if DATABASE_URL is present (Render env)
 let pool = null;
-let q = async () => { throw new Error("Database is not configured"); };
+let q = async () => {
+  throw new Error("Database is not configured");
+};
 if (DATABASE_URL) {
-  pool = new Pool({ connectionString: DATABASE_URL });
+  pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
   q = (text, params) => pool.query(text, params);
   (async function runBootMigration() {
     const sql = `
@@ -290,13 +292,21 @@ async function pickSkuForCountry({ preferredSku, countryCode }) {
   return chosen;
 }
 
-// ---------- Nodemailer ----------
-const transporter = nodemailer.createTransport({
-  host: SMTP_HOST,
-  port: parseInt(SMTP_PORT, 10),
-  secure: SMTP_PORT === "465",
-  auth: { user: SMTP_USER, pass: SMTP_PASS },
-});
+// ---------- Nodemailer (real SMTP or safe fallback) ----------
+let transporter;
+if (SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS) {
+  transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: parseInt(SMTP_PORT, 10),
+    secure: SMTP_PORT === "465",
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
+  console.log("✉️ Using real SMTP transport");
+} else {
+  // Safe dev fallback: prints email payload to logs so routes don't crash
+  transporter = nodemailer.createTransport({ jsonTransport: true });
+  console.log("✉️ SMTP envs missing — using JSON transport (logs only)");
+}
 
 // ---------- Static files ----------
 app.use("/images", express.static(path.join(process.cwd(), "src/public/images"), {
@@ -325,7 +335,6 @@ function hashToken(token) {
 }
 
 function newToken() {
-  // Node 20+: 'base64url' exists. Fallback to hex if not.
   try { return crypto.randomBytes(32).toString("base64url"); }
   catch { return crypto.randomBytes(32).toString("hex"); }
 }
@@ -367,6 +376,9 @@ app.post("/auth/send-link", async (req, res) => {
     if (!APP_ORIGIN) {
       return res.status(500).json({ error: "APP_ORIGIN not configured" });
     }
+    if (!pool) {
+      return res.status(500).json({ error: "Database not configured" });
+    }
 
     // Upsert user
     await q("INSERT INTO users (email) VALUES ($1) ON CONFLICT (email) DO NOTHING", [emailRaw]);
@@ -385,7 +397,7 @@ app.post("/auth/send-link", async (req, res) => {
 
     const verifyUrl = `${APP_ORIGIN.replace(/\/+$/,'')}/auth/verify?token=${encodeURIComponent(token)}`;
 
-    // Email
+    // Email (real SMTP or JSON-to-logs)
     const html = `
       <div style="font-family:Arial,sans-serif;color:#222">
         <h2>Sign in to Boat2Merch</h2>
@@ -396,7 +408,7 @@ app.post("/auth/send-link", async (req, res) => {
       </div>
     `;
     await transporter.sendMail({
-      from: `"boat2merch" <${SMTP_USER}>`,
+      from: SMTP_USER ? `"boat2merch" <${SMTP_USER}>` : "boat2merch@example.local",
       to: emailRaw,
       subject: "Your sign-in link",
       html
@@ -413,6 +425,7 @@ app.get("/auth/verify", async (req, res) => {
   try {
     const token = (req.query?.token || "").toString();
     if (!token) return res.status(400).send("Missing token");
+    if (!pool) return res.status(500).send("Database not configured");
 
     const tokenHash = hashToken(token);
     const now = new Date();
@@ -447,6 +460,8 @@ app.get("/auth/verify", async (req, res) => {
 
 app.get("/auth/session", async (req, res) => {
   try {
+    if (!pool) return res.json({ user: null });
+
     const sid = getSessionIdFromReq(req);
     if (!sid) return res.json({ user: null });
 
@@ -469,9 +484,11 @@ app.get("/auth/session", async (req, res) => {
 
 app.post("/auth/signout", async (req, res) => {
   try {
-    const sid = getSessionIdFromReq(req);
-    if (sid) {
-      await q("DELETE FROM sessions WHERE id=$1", [sid]).catch(() => {});
+    if (pool) {
+      const sid = getSessionIdFromReq(req);
+      if (sid) {
+        await q("DELETE FROM sessions WHERE id=$1", [sid]).catch(() => {});
+      }
     }
     res.clearCookie(SESSION_COOKIE_NAME, cookieOptions(0));
     res.json({ ok: true });
@@ -847,7 +864,7 @@ app.post(
           <img src="${imageUrl}" alt="Purchased Sticker" style="max-width:300px; border:1px solid #ccc; border-radius:6px;" />
         `;
         await transporter.sendMail({
-          from: `"boat2merch" <${SMTP_USER}>`,
+          from: SMTP_USER ? `"boat2merch" <${SMTP_USER}>` : "boat2merch@example.local",
           to: "charliebrayton8@gmail.com",
           subject: `New Sticker Order from ${buyerName}`,
           html: emailHtml,
