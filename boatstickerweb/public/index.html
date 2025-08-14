@@ -16,6 +16,106 @@
     .hero .lead-wrap { max-width: 560px; }
     .hero .controls { justify-content: flex-start; margin-top: 14px; margin-left: 4px; }
     .hero #statusArea { margin-top: 12px; }
+
+    /* ---------- Free-tier limit modal (self-contained styles) ---------- */
+    .hidden { display: none !important; }
+
+    .limit-modal {
+      position: fixed; inset: 0;
+      display: grid; place-items: center;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(2px);
+      z-index: 1000;
+      padding: 18px;
+    }
+    .limit-card {
+      width: 100%;
+      max-width: 640px;
+      background: radial-gradient(120% 120% at 10% 0%, #262626 0%, #1b1b1b 60%);
+      border: 1px solid #333;
+      border-radius: 16px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.03) inset;
+      overflow: hidden;
+      position: relative;
+    }
+    .limit-card .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; border-bottom: 1px solid #2a2a2a;
+      background: linear-gradient(180deg, rgba(255,152,0,.06), rgba(255,152,0,0));
+    }
+    .limit-card .badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-weight: 800; letter-spacing: .4px;
+      background: #2b2b2b; border: 1px solid #3a3a3a; color: #ffb347;
+      padding: 8px 12px; border-radius: 999px;
+    }
+    .limit-card .close-x {
+      background: transparent; border: none; color: #bbb; font-size: 22px; cursor: pointer;
+      width: 34px; height: 34px; line-height: 34px; border-radius: 8px;
+    }
+    .limit-card .close-x:hover { background: #2a2a2a; color: #fff; }
+
+    .limit-body {
+      padding: 18px 18px 8px 18px;
+      display: grid; grid-template-columns: 1.2fr .9fr; gap: 18px;
+    }
+    @media (max-width: 820px) {
+      .limit-body { grid-template-columns: 1fr; }
+    }
+
+    .limit-hero {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .limit-hero h2 {
+      margin: 0; font-size: clamp(1.2rem, 2.6vw, 1.6rem);
+    }
+    .limit-hero p { margin: 0; color: #cfcfcf; }
+
+    .limit-feats {
+      background: #181818; border: 1px solid #2a2a2a; border-radius: 12px;
+      padding: 14px;
+    }
+    .limit-feats h4 { margin: 0 0 8px; color: #ffb347; }
+    .limit-feats ul { margin: 0; padding: 0 0 0 18px; color: #cfcfcf; }
+    .limit-feats li { margin: 6px 0; }
+
+    .limit-cta {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px;
+    }
+    .limit-price {
+      display: inline-flex; align-items: baseline; gap: 8px;
+      padding: 10px 12px; border-radius: 12px; background: #222; border: 1px solid #333; color: #ffb347;
+      font-weight: 800;
+    }
+    .limit-price small { color: #bbb; font-weight: 600; }
+
+    .limit-sample {
+      background: #111; border-left: 1px solid #2a2a2a;
+      padding: 14px;
+      display: grid; gap: 10px;
+    }
+    .limit-sample .mini {
+      height: 86px; border-radius: 10px; border: 1px solid #333;
+      background:
+        radial-gradient(120% 80% at 0% 0%, rgba(255,152,0,.14), rgba(255,152,0,0)),
+        linear-gradient(180deg, #1b1b1b, #131313);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+      display: grid; place-items: center; color: #ddd; font-weight: 700;
+    }
+    .limit-safe {
+      display: flex; align-items: center; gap: 10px; color: #aaa; font-size: 13px;
+    }
+    .limit-safe svg { opacity: .8; }
+
+    /* Reuse your existing button styles; add a subtle glow for the pro CTA */
+    .btn-pro {
+      background: #ff9800; color: #121212; border: none; border-radius: 10px;
+      padding: 12px 16px; font-weight: 800; cursor: pointer;
+      box-shadow: 0 10px 22px rgba(255,152,0,.35);
+    }
+    .btn-pro:hover { transform: translateY(-1px); box-shadow: 0 14px 26px rgba(255,152,0,.45); }
+    .btn-ghost.dim { background:#232323; border:1px solid #333; color:#ddd; }
+    .btn-ghost.dim:hover { background:#2a2a2a; }
   </style>
 </head>
 <body>
@@ -153,6 +253,49 @@
     </div>
   </div>
 
+  <!-- Free tier LIMIT Modal -->
+  <div id="limitModal" class="limit-modal hidden" role="dialog" aria-modal="true" aria-labelledby="limitTitle">
+    <div class="limit-card">
+      <div class="topbar">
+        <span class="badge">🚀 Pro unlock</span>
+        <button class="close-x" id="limitClose" aria-label="Close">×</button>
+      </div>
+      <div class="limit-body">
+        <div class="limit-hero">
+          <h2 id="limitTitle">You've hit the free limit</h2>
+          <p>Upgrade to <strong>Boat2Merch Pro</strong> to keep generating and get a smoother workflow.</p>
+
+          <div class="limit-feats">
+            <h4>Pro includes</h4>
+            <ul>
+              <li>More daily generations</li>
+              <li>Priority processing in the queue</li>
+              <li>Higher-resolution output</li>
+              <li>Early access to new features</li>
+            </ul>
+          </div>
+
+          <div class="limit-cta">
+            <span class="limit-price">$7 <small>/ month</small></span>
+            <button id="limitGoPro" class="btn-pro">Unlock Pro</button>
+            <button id="limitMaybe" class="btn btn-ghost dim">Maybe later</button>
+          </div>
+
+          <div class="limit-safe">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7v6c0 5 3.8 9.7 10 11 6.2-1.3 10-6 10-11V7l-10-5Z" stroke="currentColor" stroke-width="1.3"/><path d="M8 12l2.5 2.5L16 9" stroke="currentColor" stroke-width="1.6"/></svg>
+            <span>Secure checkout via Stripe. Cancel anytime.</span>
+          </div>
+        </div>
+
+        <div class="limit-sample">
+          <div class="mini">Pro Sample A</div>
+          <div class="mini">Pro Sample B</div>
+          <div class="mini">Pro Sample C</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Tiny toast -->
   <div id="toast" class="toast hidden"></div>
 
@@ -184,6 +327,12 @@
     const authNote = document.getElementById("authNote");
     const toast = document.getElementById("toast");
 
+    // Limit modal
+    const limitModal = document.getElementById("limitModal");
+    const limitClose = document.getElementById("limitClose");
+    const limitMaybe = document.getElementById("limitMaybe");
+    const limitGoPro = document.getElementById("limitGoPro");
+
     let currentMode = "image"; // "image" | "sticker"
     let isAuthed = false;
 
@@ -205,8 +354,8 @@
     async function fetchJSON(url, opts) {
       const r = await fetch(url, opts);
       const t = await r.text();
-      try { return { ok: r.ok, json: JSON.parse(t) }; }
-      catch { return { ok: r.ok, json: t }; }
+      try { return { ok: r.ok, status: r.status, json: JSON.parse(t) }; }
+      catch { return { ok: r.ok, status: r.status, json: t }; }
     }
     function setAuthedState(email) {
       isAuthed = !!email;
@@ -222,6 +371,12 @@
         userPill.classList.add("hidden");
         userEmailEl.textContent = "";
       }
+    }
+    function showLimitModal() {
+      limitModal.classList.remove("hidden");
+    }
+    function hideLimitModal() {
+      limitModal.classList.add("hidden");
     }
 
     async function checkSession() {
@@ -278,6 +433,15 @@
       }
     });
 
+    // Limit modal wiring
+    limitClose?.addEventListener("click", hideLimitModal);
+    limitMaybe?.addEventListener("click", hideLimitModal);
+    limitModal?.addEventListener("click", (e) => { if (e.target === limitModal) hideLimitModal(); });
+    limitGoPro?.addEventListener("click", () => {
+      // Send them to pricing or open checkout—update this link as you like
+      window.location.href = "/pricing.html#pro";
+    });
+
     // --------------- Generate buttons ---------------
     btnImage.addEventListener("click", () => { currentMode = "image"; boatUpload.click(); });
     btnSticker.addEventListener("click", () => { currentMode = "sticker"; boatUpload.click(); });
@@ -297,27 +461,45 @@
       `;
 
       const file = boatUpload.files[0];
-      const formData = new FormData();
-      formData.append("boatImage", file);
-      formData.append("mode", currentMode);
+      const fd = new FormData();
+      fd.append("boatImage", file);
+      fd.append("mode", currentMode);
 
       try {
-        const uploadResp = await fetch("/generate-image", { method: "POST", body: formData });
-        if (!uploadResp.ok) throw new Error("Upload failed");
+        // 1) kick off generation
+        const up = await fetch("/generate-image", { method: "POST", body: fd });
 
-        const { prediction } = await uploadResp.json();
+        // If we’re rate-limited by the server, show the Pro modal and stop.
+        if (up.status === 429) {
+          statusArea.innerHTML = "";
+          showLimitModal();
+          boatUpload.value = "";
+          return;
+        }
+
+        if (!up.ok) throw new Error("Upload failed");
+
+        const { prediction } = await up.json();
         const predictionId = prediction?.id;
         if (!predictionId) throw new Error("No prediction ID returned");
 
-        const pollInterval = 2000; // ms
+        // 2) poll status
+        const pollInterval = 2000;
         const maxAttempts = 30;
         let attempts = 0;
 
         async function poll() {
           attempts++;
-          const statusResp = await fetch(`/prediction-status/${predictionId}?mode=${currentMode}`);
+          const resp = await fetch(`/prediction-status/${predictionId}?mode=${currentMode}`);
 
-          const statusData = await statusResp.json();
+          // If rate-limited mid-flight (e.g., we counted this attempt), show Pro modal.
+          if (resp.status === 429) {
+            statusArea.innerHTML = "";
+            showLimitModal();
+            return;
+          }
+
+          const statusData = await resp.json();
 
           if (statusData.status === "succeeded" && statusData.output?.length) {
             const imageUrl = statusData.output[0];
@@ -384,4 +566,3 @@
   </script>
 </body>
 </html>
-
