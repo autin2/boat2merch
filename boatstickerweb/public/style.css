@@ -297,7 +297,7 @@ nav a.active {
   background: #0288d1;
 }
 
-/* (Old) green secondary kept; controls area redefines secondary to blue later */
+/* (Old) green secondary kept; controls area redefines secondary to blue later) */
 .btn-secondary {
   background: #4caf50;
   color: #fff;
@@ -456,30 +456,40 @@ nav.topnav a.active::after { width:100%; }
 
 .muted { color:#bcbcbc; }
 
-.btn { border:none; cursor:pointer; border-radius:10px; padding:12px 18px; font-weight:700;
+/* Base button polish + motion */
+.btn {
+  border:none; cursor:pointer; border-radius:10px; padding:12px 18px; font-weight:700;
   transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease, color .12s ease;
   box-shadow: 0 0 0 rgba(0,0,0,0);
 }
 .btn:active { transform: translateY(1px) scale(.995); }
 .btn:focus-visible { outline: 2px solid #ff9800; outline-offset: 2px; }
 
+/* Primary / ghost variants with lift on hover */
 .btn-primary { background:#ff9800; color:#121212; }
 .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(255,152,0,.35); }
 
 .btn-ghost { background:#2a2a2a; color:#eaeaea; border:1px solid #3a3a3a; }
 .btn-ghost:hover { transform: translateY(-1px); box-shadow: 0 8px 16px rgba(0,0,0,.35); }
 
+/* Button spacing fix */
 .controls { gap: 10px; justify-content: center; }
 .controls .btn { min-width: 160px; flex: 0 1 auto; }
 
+/* Blue secondary specifically inside the controls row */
 .controls .btn-secondary {
   background:#03a9f4; color:#121212; margin-top:0;
 }
 .controls .btn-secondary:hover { background:#0288d1; transform: translateY(-1px); box-shadow: 0 8px 18px rgba(2,136,209,.35); }
 
+/* Transparent action area (no big box behind buttons) */
 .action-card { padding: 0; background: transparent; border: 0; box-shadow: none; }
-.action-card .controls { position: relative; padding: 6px 8px; }
+.action-card .controls {
+  position: relative;
+  padding: 6px 8px;
+}
 
+/* Subtle "offset plate" under the buttons for looks */
 .action-card .controls::before {
   content: "";
   position: absolute;
@@ -510,20 +520,27 @@ nav.topnav a.active::after { width:100%; }
 #editBtn { visibility:hidden; }
 #editBtn.visible { visibility:visible; }
 
-section .card.pad { margin-bottom: 24px; }
+/* How It Works page spacing fix */
+section .card.pad {
+  margin-bottom: 24px;
+}
 
+/* Reduce motion preference */
 @media (prefers-reduced-motion: reduce) {
   .btn, .card, nav.topnav a::after { transition: none; }
 }
 
+/* --- Account pill + small buttons --- */
 .account-slot { display:flex; align-items:center; gap:10px; }
 .btn.small { padding:8px 12px; border-radius:8px; font-size:.9rem; }
 .btn.tiny { padding:6px 10px; border-radius:8px; font-size:.8rem; }
 .signed-in-pill { display:flex; align-items:center; gap:8px; background:#202020; border:1px solid #2e2e2e; border-radius:999px; padding:6px 10px; }
 .hidden { display:none !important; }
 
+/* --- Result gate (blur overlay until signed in) --- */
 .result-wrap { position: relative; }
-.gate { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+.gate {
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   backdrop-filter: blur(3px);
   background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.5));
   border-radius: 10px;
@@ -535,18 +552,68 @@ section .card.pad { margin-bottom: 24px; }
 }
 .gate-box h3 { margin:0 0 6px; }
 
-.auth-modal { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+/* --- Auth modal --- */
+.auth-modal {
+  position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
   background: rgba(0,0,0,.55); z-index: 1000;
 }
 .auth-modal.hidden { display:none; }
-.auth-card { width:min(92vw, 440px);
+.auth-card {
+  width:min(92vw, 440px);
   background:#1b1b1b; border:1px solid #2c2c2c; border-radius:14px; padding:20px;
   box-shadow: 0 12px 36px rgba(0,0,0,.4);
   position: relative;
 }
-.auth-close { position:absolute; top:10px; right:10px; border:none; background:transparent; color:#aaa; font-size:22px; cursor:pointer;
+.auth-close {
+  position:absolute; top:10px; right:10px; border:none; background:transparent; color:#aaa; font-size:22px; cursor:pointer;
 }
 #authForm { display:flex; gap:10px; }
-#authForm input[type="email"] { flex:1; background:#2a2a2a; border:1px solid #3a3a3a; color:#eaeaea; padding:10px 12px; border-radius:8px;
+#authForm input[type="email"] {
+  flex:1; background:#2a2a2a; border:1px solid #3a3a3a; color:#eaeaea; padding:10px 12px; border-radius:8px;
 }
-.sr-only { position:absolute !
+.sr-only { position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+
+/* --- Toast --- */
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: 22px; background: #222; color: #fff; padding: 10px 14px;
+  border: 1px solid #333; border-radius: 10px; z-index: 1100;
+}
+
+/* ==== PRO LIMIT MODAL (alt theme: may be unused but safe) ==== */
+.limit-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none; /* toggled with .open or .hidden on element */
+}
+.limit-modal.open { display: block; }
+
+/* --- CTA UPGRADE: Make generate buttons unmissable --- */
+.btn-generate {
+  background: linear-gradient(135deg, #ff9800, #ff5f00) !important;
+  color: #121212 !important;
+  font-size: 1.15rem !important;
+  font-weight: 800 !important;
+  padding: 14px 28px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 6px 18px rgba(255, 152, 0, 0.45) !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+.btn-generate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(255, 152, 0, 0.6);
+}
+.btn-generate:active {
+  transform: translateY(0);
+}
+
+/* Optional: slight emphasis for the two main buttons as a group */
+.controls .btn-generate {
+  min-width: 180px;
+}
+
+/* If any empty sample column exists, hide it (defensive) */
+.limit-sample:empty {
+  display: none;
+}
