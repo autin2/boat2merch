@@ -617,3 +617,74 @@ section .card.pad {
 .limit-sample:empty {
   display: none;
 }
+
+/* ==== NEW / OVERRIDES TO POSITION ACCOUNT AREA FAR RIGHT ==== */
+/* Make the header row a reliable 3-column grid: brand | nav | account */
+.nav-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+}
+
+/* Keep nav centered within the middle column */
+nav.topnav {
+  display: flex;
+  gap: 18px;
+  justify-self: center;
+}
+
+/* Push the account area hard-right */
+.account-slot {
+  justify-self: end;
+  margin-left: auto; /* extra safety in case flex kicks in elsewhere */
+}
+
+/* Mobile: stack neatly */
+@media (max-width: 760px) {
+  .nav-row {
+    grid-template-columns: 1fr auto;
+    row-gap: 8px;
+  }
+  nav.topnav {
+    grid-column: 1 / -1;
+    justify-self: start;
+    flex-wrap: wrap;
+  }
+  .account-slot {
+    grid-column: 2 / 3;
+    justify-self: end;
+  }
+}
+
+/* ==== SUBSCRIPTION PILL (FREE/PRO) ==== */
+.subscription-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #222;
+  border: 1px solid #333;
+  color: #ddd;
+  font-weight: 800;
+  letter-spacing: .3px;
+  font-size: .85rem;
+  line-height: 1;
+}
+
+.subscription-pill.free {
+  background: #222;
+  border-color: #333;
+  color: #ddd;
+}
+
+/* Gold/orange gradient with subtle glow for PRO */
+.subscription-pill.pro {
+  background: linear-gradient(135deg, #ffd87a 0%, #ffb347 45%, #ff9800 100%);
+  color: #121212;
+  border-color: rgba(255,152,0,.5);
+  box-shadow:
+    0 0 12px rgba(255,153,0,.45),
+    0 0 1px 1px rgba(255,255,255,.06) inset;
+  text-shadow: 0 1px 0 rgba(255,255,255,.25);
+}
