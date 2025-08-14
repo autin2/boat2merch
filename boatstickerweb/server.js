@@ -61,19 +61,19 @@ if (DATABASE_URL) {
 
 // ---------- Migration SQL ----------
 const MIGRATION_SQL = `
-DO $$
+DO $do$
 BEGIN
   BEGIN
     CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
   EXCEPTION WHEN OTHERS THEN
     CREATE EXTENSION IF NOT EXISTS "pgcrypto";
     IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname='uuid_generate_v4') THEN
-      CREATE OR REPLACE FUNCTION uuid_generate_v4() RETURNS uuid AS $$
+      CREATE OR REPLACE FUNCTION uuid_generate_v4() RETURNS uuid AS $fn$
         SELECT gen_random_uuid();
-      $$ LANGUAGE SQL;
+      $fn$ LANGUAGE SQL;
     END IF;
   END;
-END$$;
+END$do$;
 
 CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS generations (
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (user_id, external_id)
 );
+
 `;
 
 // ---------- App + transports ----------
@@ -811,3 +812,4 @@ async function start() {
 }
 
 start();
+
