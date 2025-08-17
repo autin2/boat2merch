@@ -558,14 +558,17 @@
 
             // Gate: if not signed in, blur + disable actions
             if (!isAuthed) {
-              gate.classList.remove("hidden");
-              downloadBtn.setAttribute("aria-disabled", "true");
-              downloadBtn.removeAttribute("href");
-            } else {
-              gate.classList.add("hidden");
-              downloadBtn.href = imageUrl;
-              downloadBtn.removeAttribute("aria-disabled");
-            }
+  gate.classList.remove("hidden");
+  downloadBtn.setAttribute("aria-disabled", "true");
+  downloadBtn.removeAttribute("href");
+  downloadBtn.removeAttribute("download");
+} else {
+  gate.classList.add("hidden");
+  downloadBtn.href = imageUrl;
+  downloadBtn.setAttribute("download", "boat-ai-design.png"); // <-- force download
+  downloadBtn.removeAttribute("aria-disabled");
+}
+
 
           } else if (statusData.status === "failed") {
             statusArea.innerHTML = `<div class="card pad" style="border-color:#733;">Generation failed. Please try a different photo.</div>`;
@@ -602,3 +605,4 @@
   </script>
 </body>
 </html>
+
