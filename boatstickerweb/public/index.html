@@ -173,7 +173,7 @@
   <!-- Hero -->
   <section class="hero">
     <div class="container hero-inner">
-      <!-- Left: copy + controls -->
+      <!-- Left: copy + actions -->
       <div class="lead-wrap">
         <h1 class="headline">Turn your boat photo into a clean, die-cut sticker — instantly.</h1>
         <p class="subhead">Upload a photo. Our AI returns a crisp line-art with an optional white contour, ready for stickers, shirts, and more.</p>
@@ -181,10 +181,30 @@
         <!-- Hidden system file input -->
         <input type="file" id="boatUpload" accept="image/*" style="display:none" />
 
-        <!-- Buttons under the text -->
-        <div class="controls">
-          <button class="btn btn-primary btn-generate" id="btnImage">Generate an Image</button>
-          <button class="btn btn-secondary btn-generate" id="btnSticker">Generate a Sticker</button>
+        <!-- NEW: Review card on the left of the generate buttons -->
+        <div class="lead-action-row">
+          <aside class="card pad review-card" aria-label="Customer review">
+            <div class="stars" aria-label="Rated 5 out of 5 stars">
+              <!-- five stars -->
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 17.3l-6.18 3.73 1.64-7.03L2 9.97l7.19-.62L12 2.8l2.81 6.55 7.19.62-5.46 4.03 1.64 7.03z"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 17.3l-6.18 3.73 1.64-7.03L2 9.97l7.19-.62L12 2.8l2.81 6.55 7.19.62-5.46 4.03 1.64 7.03z"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 17.3l-6.18 3.73 1.64-7.03L2 9.97l7.19-.62L12 2.8l2.81 6.55 7.19.62-5.46 4.03 1.64 7.03z"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 17.3l-6.18 3.73 1.64-7.03L2 9.97l7.19-.62L12 2.8l2.81 6.55 7.19.62-5.46 4.03 1.64 7.03z"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 17.3l-6.18 3.73 1.64-7.03L2 9.97l7.19-.62L12 2.8l2.81 6.55 7.19.62-5.46 4.03 1.64 7.03z"/></svg>
+            </div>
+            <p class="review-text">
+              “Ridiculously clean results. The white outline made our stickers pop — we reordered the same day.”
+            </p>
+            <div class="reviewer">
+              <span class="name">Tyler S.</span> · <span class="meta">Verified boater</span>
+            </div>
+          </aside>
+
+          <!-- Buttons on the right -->
+          <div class="controls">
+            <button class="btn btn-primary btn-generate" id="btnImage">Generate an Image</button>
+            <button class="btn btn-secondary btn-generate" id="btnSticker">Generate a Sticker</button>
+          </div>
         </div>
 
         <!-- Status -->
@@ -558,17 +578,16 @@
 
             // Gate: if not signed in, blur + disable actions
             if (!isAuthed) {
-  gate.classList.remove("hidden");
-  downloadBtn.setAttribute("aria-disabled", "true");
-  downloadBtn.removeAttribute("href");
-  downloadBtn.removeAttribute("download");
-} else {
-  gate.classList.add("hidden");
-  downloadBtn.href = imageUrl;
-  downloadBtn.setAttribute("download", "boat-ai-design.png"); // <-- force download
-  downloadBtn.removeAttribute("aria-disabled");
-}
-
+              gate.classList.remove("hidden");
+              downloadBtn.setAttribute("aria-disabled", "true");
+              downloadBtn.removeAttribute("href");
+              downloadBtn.removeAttribute("download");
+            } else {
+              gate.classList.add("hidden");
+              downloadBtn.href = imageUrl;
+              downloadBtn.setAttribute("download", "boat-ai-design.png"); // <-- force download
+              downloadBtn.removeAttribute("aria-disabled");
+            }
 
           } else if (statusData.status === "failed") {
             statusArea.innerHTML = `<div class="card pad" style="border-color:#733;">Generation failed. Please try a different photo.</div>`;
@@ -605,4 +624,3 @@
   </script>
 </body>
 </html>
-
