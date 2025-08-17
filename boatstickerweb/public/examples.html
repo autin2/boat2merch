@@ -9,7 +9,7 @@
   <title>Examples - Boat2Merch</title>
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" sizes="32x32" href="/images/icon.png?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/icon.png?v=3" />
 
   <link rel="stylesheet" href="style.css" />
   <style>
@@ -187,6 +187,88 @@
       marquee.addEventListener('mouseenter', () => setPlaybackRate(0.4)); // slow, don't stop
       marquee.addEventListener('mouseleave', () => setPlaybackRate(1));
     })();
+  </script>
+
+  <!-- Minimal header auth/plan wiring (cookie-backed) -->
+  <script>
+  (async () => {
+    const signinBtn = document.getElementById("signinBtn");
+    const userPill  = document.getElementById("userPill");
+    const userEmail = document.getElementById("userEmail");
+    const signoutBtn= document.getElementById("signoutBtn");
+    const planBadge = document.getElementById("planBadge");
+
+    const fetchJSON = async (url, opts) => {
+      const r = await fetch(url, opts);
+      const t = await r.text();
+      try { return { ok: r.ok, status: r.status, json: JSON.parse(t) }; }
+      catch { return { ok: r.ok, status: r.status, json: t }; }
+    };
+
+    function setAuthedState(email) {
+      const authed = !!email;
+      if (authed) {
+        signinBtn?.classList.add("hidden");
+        userPill?.classList.remove("hidden");
+        if (userEmail) userEmail.textContent = email;
+      } else {
+        signinBtn?.classList.remove("hidden");
+        userPill?.classList.add("hidden");
+        if (userEmail) userEmail.textContent = "";
+      }
+    }
+    function setPlanBadgeUI(plan) {
+      const p = (plan || "free").toLowerCase();
+      if (!planBadge) return;
+      if (p === "pro") {
+        planBadge.textContent = "PRO";
+        planBadge.classList.add("pro");
+      } else {
+        planBadge.textContent = "FREE";
+        planBadge.classList.remove("pro");
+      }
+    }
+
+    // Redirect to index to open the auth modal (reuses the modal there)
+    signinBtn?.addEventListener("click", () => {
+      const here = location.pathname.replace(/^\//, "");
+      const url = new URL("index.html", location.origin);
+      url.hash = "signin";
+      url.searchParams.set("from", here);
+      location.href = url.toString();
+    });
+
+    signoutBtn?.addEventListener("click", async () => {
+      await fetchJSON("/auth/signout", { method: "POST" });
+      setAuthedState(null);
+      setPlanBadgeUI("free");
+    });
+
+    // Read cookie-backed session & plan
+    try {
+      const s = await fetchJSON("/auth/session");
+      setAuthedState(s.ok && s.json?.user?.email ? s.json.user.email : null);
+    } catch { setAuthedState(null); }
+
+    try {
+      const p = await fetchJSON("/me/plan");
+      setPlanBadgeUI(p.ok && p.json?.plan ? p.json.plan : "free");
+    } catch { setPlanBadgeUI("free"); }
+
+    // Honor ?login=ok if you ever link back here after verify
+    const usp = new URLSearchParams(location.search);
+    if (usp.get("login") === "ok") {
+      const url = new URL(location.href);
+      url.searchParams.delete("login");
+      history.replaceState({}, "", url);
+      try {
+        const s = await fetchJSON("/auth/session");
+        setAuthedState(s.ok && s.json?.user?.email ? s.json.user.email : null);
+        const p = await fetchJSON("/me/plan");
+        setPlanBadgeUI(p.ok && p.json?.plan ? p.json.plan : "free");
+      } catch {}
+    }
+  })();
   </script>
 </body>
 </html>
