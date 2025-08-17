@@ -115,10 +115,12 @@
 </head>
 <body>
 
+  <!-- Header -->
   <header class="site-header">
     <div class="container nav-row">
+      <!-- Left group: brand + nav -->
       <div class="brand">
-        <img src="/images/icon.png" class="logo-img" alt="" width="24" height="24" />
+        <img src="/images/icon.png" class="logo-img" alt="" width="40" height="40" />
         <span>Boat2Merch</span>
       </div>
       <nav class="topnav" aria-label="Primary">
@@ -128,6 +130,20 @@
         <a href="examples.html">Examples</a>
         <a href="contact.html">Contact</a>
       </nav>
+
+      <!-- Right group: plan badge + auth pill/sign-in -->
+      <div class="account-area">
+        <span id="planBadge" class="plan-badge">FREE</span>
+
+        <!-- Sign in button (shown when logged out) -->
+        <button id="signinBtn" class="btn btn-ghost small">Sign in</button>
+
+        <!-- Signed-in pill (shown when logged in) -->
+        <div id="userPill" class="signed-in-pill hidden">
+          <span id="userEmail" class="email"></span>
+          <button id="signoutBtn" class="btn btn-ghost tiny">Sign out</button>
+        </div>
+      </div>
     </div>
   </header>
 
