@@ -719,3 +719,46 @@ header.site-header .container.nav-row {
   gap: 12px;
 }
 
+
+/* --- Shared account area + plan badge (match index.html) --- */
+.account-area {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.plan-badge {
+  font-weight: 800;
+  font-size: .9rem;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #2a2a2a;
+  color: #cfcfcf;
+  border: 1px solid #353535;
+  letter-spacing: .3px;
+}
+
+.plan-badge.pro {
+  background: linear-gradient(135deg,#ffcc33,#ff9800);
+  color: #121212;
+  box-shadow: 0 0 10px rgba(255,152,0,.55), 0 0 22px rgba(255,152,0,.28);
+  border-color: rgba(255,200,80,.6);
+}
+
+/* Compact signed-in pill (matches index) */
+.signed-in-pill {
+  display:flex; align-items:center; gap:8px;
+  background:#202020; border:1px solid #2e2e2e; border-radius:999px; padding:6px 10px;
+}
+.signed-in-pill .email {
+  white-space: nowrap; max-width: 26ch; overflow: hidden; text-overflow: ellipsis;
+  color: #eaeaea; font-size: .9rem;
+}
+
+/* Small/tiny button helpers used in the header */
+.btn.tiny { padding:6px 10px; border-radius:8px; font-size:.8rem; }
+.btn.small { padding:8px 12px; border-radius:8px; font-size:.9rem; }
+
+/* Utility */
+.hidden { display: none !important; }
