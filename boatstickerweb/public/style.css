@@ -780,13 +780,28 @@ header.site-header .container.nav-row {
   align-items: center;
 }
 
-/* Review card styling */
+/* === 3-column hero layout (Left review | Center lead | Right how-to) === */
+@media (min-width: 980px) {
+  .hero .container.hero-inner {
+    display: grid;
+    grid-template-columns: 1fr minmax(0, 560px) 1fr; /* left | center | right */
+    align-items: start;
+    gap: 18px;
+  }
+}
+@media (max-width: 979.98px) {
+  .hero .container.hero-inner {
+    display: grid;
+    grid-template-columns: 1fr; /* stack on mobile */
+    gap: 14px;
+  }
+}
+
+/* Review card styling (matches your dark theme + orange accent) */
 .review-card {
   background: linear-gradient(180deg, #1b1b1b, #171717);
   border: 1px solid #2a2a2a;
   border-radius: 12px;
-  min-width: 260px;
-  max-width: 320px;
   color: #eaeaea;
   box-shadow: 0 8px 28px rgba(0,0,0,.35);
 }
@@ -794,7 +809,7 @@ header.site-header .container.nav-row {
 .review-card .stars {
   display: flex;
   gap: 4px;
-  color: #ff9800; /* accent */
+  color: #ff9800;
   margin-bottom: 8px;
 }
 
@@ -808,21 +823,8 @@ header.site-header .container.nav-row {
   font-size: 0.9rem;
   color: #a8a8a8;
 }
-
 .review-card .reviewer .name {
   color: #ffd38a;
   font-weight: 700;
 }
 
-/* Responsive: stack on small screens */
-@media (max-width: 860px) {
-  .lead-action-row {
-    flex-direction: column;
-  }
-  .review-card {
-    max-width: 100%;
-  }
-  .lead-action-row .controls {
-    justify-content: flex-start;
-  }
-}
