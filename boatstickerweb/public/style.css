@@ -763,3 +763,30 @@ header.site-header .container.nav-row {
 /* Utility */
 .hidden { display: none !important; }
 
+/* ==== FINAL RESPONSIVE + MOBILE POLISH (OVERRIDES) ==== */
+/* Make the primary nav horizontally scrollable on small screens */
+nav.topnav {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+nav.topnav::-webkit-scrollbar { display: none; }
+
+/* Ensure hero buttons center on mobile despite inline styles in index.html */
+@media (max-width: 900px) {
+  .hero .controls { justify-content: center !important; margin-left: 0 !important; }
+  .hero .lead-wrap { max-width: 100% !important; }
+  .controls .btn { min-width: 140px; }
+  .hero { padding: 40px 14px; }
+  .headline { font-size: clamp(1.6rem, 6.5vw, 2.1rem); }
+  .subhead { font-size: .95rem; }
+  .card.pad { padding:16px; }
+  footer { padding: 16px; }
+}
+
+/* Keep header as 3-column grid on all sizes, with account area pinned right */
+.nav-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+}
