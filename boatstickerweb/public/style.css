@@ -794,19 +794,29 @@ nav.topnav::-webkit-scrollbar { display: none; }
 /* ===== Free vs Pro Compare Modal ===== */
 .compare-modal {
   position: fixed; inset: 0; z-index: 1200;
-  display: grid; place-items: center;
+  display: flex;                  /* flex lets us anchor to top on phones */
+  justify-content: center;
+  align-items: flex-start;        /* keep header/X visible */
   background: rgba(0,0,0,.55);
   backdrop-filter: blur(2px);
-  padding: 18px;
+  /* Let the overlay scroll if the card is taller than the viewport */
+  overflow-y: auto;
+  /* Safe-area aware padding (iOS notches) */
+  padding: max(12px, env(safe-area-inset-top)) 12px
+           max(12px, env(safe-area-inset-bottom)) 12px 12px;
 }
 .compare-modal.hidden { display: none !important; }
 
 .compare-card {
-  width: 100%; max-width: 920px;
+  width: min(920px, calc(100% - 24px));
+  /* IMPORTANT: cap height to small viewport (svh) so it never runs off-screen */
+  max-height: min(92svh, 720px);
+  display: flex;                  /* sticky header + scrollable body */
+  flex-direction: column;
   background: radial-gradient(120% 120% at 10% 0%, #262626 0%, #1b1b1b 60%);
   border: 1px solid #2e2e2e; border-radius: 16px;
   box-shadow: 0 24px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.03) inset;
-  overflow: hidden; position: relative;
+  overflow: hidden;               /* body scrolls inside */
   animation: cmpPop .18s ease-out;
 }
 @keyframes cmpPop { from { transform: scale(.98); opacity: 0 } to { transform: scale(1); opacity: 1 } }
@@ -815,6 +825,8 @@ nav.topnav::-webkit-scrollbar { display: none; }
   display:flex; align-items:center; justify-content:space-between;
   padding:12px 14px; border-bottom:1px solid #2a2a2a;
   background: linear-gradient(180deg, rgba(255,152,0,.06), rgba(255,152,0,0));
+  position: sticky; top: 0; z-index: 2;   /* keeps the X button pinned */
+  backface-visibility: hidden;            /* iOS repaint fix */
 }
 .cmp-badge {
   display:inline-flex; align-items:center; gap:8px;
@@ -828,23 +840,23 @@ nav.topnav::-webkit-scrollbar { display: none; }
 }
 .cmp-close:hover { background:#2a2a2a; color:#fff; }
 
-.cmp-body { padding: 18px; display: grid; gap: 18px; }
+.cmp-body {
+  /* This is the scrollable area inside the card */
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 18px;
+  display: grid; gap: 18px;
+}
 .cmp-hero h2 { margin: 0 0 6px; font-size: clamp(1.2rem, 2.6vw, 1.6rem); }
 .cmp-hero p { margin: 0; color: #cfcfcf; }
 
-.cmp-grid {
-  display: grid; gap: 16px;
-  grid-template-columns: 1fr 1fr;
-}
-@media (max-width: 860px) {
-  .cmp-grid { grid-template-columns: 1fr; }
-}
+.cmp-grid { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+@media (max-width: 860px) { .cmp-grid { grid-template-columns: 1fr; } }
 
 .cmp-col { background:#181818; border:1px solid #2a2a2a; border-radius: 12px; padding: 14px; }
 .cmp-tag {
   display:inline-block; font-weight:900; letter-spacing:.3px; font-size:.8rem;
-  padding:6px 10px; border-radius:999px; border:1px solid;
-  margin-bottom:10px;
+  padding:6px 10px; border-radius:999px; border:1px solid; margin-bottom:10px;
 }
 .cmp-tag.free { background:#222; border-color:#333; color:#e2e2e2; }
 .cmp-tag.pro {
@@ -866,7 +878,7 @@ nav.topnav::-webkit-scrollbar { display: none; }
 
 .cmp-cta { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 
-/* If you already defined .btn-pro elsewhere, this duplicate is harmless (same values). */
+/* If you already defined .btn-pro elsewhere, this duplicate is harmless */
 .btn-pro {
   background: #ff9800; color: #121212; border: none; border-radius: 10px;
   padding: 12px 16px; font-weight: 800; cursor: pointer;
@@ -876,13 +888,15 @@ nav.topnav::-webkit-scrollbar { display: none; }
 
 /* ===== Mobile polish for Free vs Pro Compare Modal ===== */
 @media (max-width: 520px) {
-  .compare-modal { padding: 10px; }
+  .compare-modal { padding: max(10px, env(safe-area-inset-top)) 10px
+                            max(10px, env(safe-area-inset-bottom)) 10px; }
 
   .compare-card {
-    width: 100vw;
+    width: 100%;
     max-width: none;
-    margin: 0;
     border-radius: 12px;
+    /* Slightly shorter on very small phones so the header never hides */
+    max-height: 88svh;
   }
 
   .cmp-topbar { padding: 10px 12px; }
@@ -896,12 +910,10 @@ nav.topnav::-webkit-scrollbar { display: none; }
 
   .cmp-col { padding: 12px; border-radius: 10px; }
 
-  .cmp-thumb {
-    min-height: 160px;
-    padding: 8px;
-  }
+  .cmp-thumb { min-height: 140px; padding: 8px; }
   .cmp-thumb img {
-    max-height: 40vh;      /* keep images contained on short screens */
+    /* Keep images contained on short screens */
+    max-height: 36svh;
     width: 100%;
     height: auto;
     object-fit: contain;
@@ -915,9 +927,8 @@ nav.topnav::-webkit-scrollbar { display: none; }
     gap: 8px;
   }
   .cmp-cta .btn,
-  .cmp-cta .btn-pro {
-    width: 100%;
-  }
+  .cmp-cta .btn-pro { width: 100%; }
+
   /* Remove inline auto-margin on mobile for the 'Don’t show again' button */
   .cmp-cta .btn[style*="margin-left:auto"] { margin-left: 0 !important; }
 }
@@ -932,5 +943,4 @@ nav.topnav::-webkit-scrollbar { display: none; }
 
 /* Prevent background scroll when any modal is open (toggle this class in JS) */
 body.modal-open { overflow: hidden; }
-
 
