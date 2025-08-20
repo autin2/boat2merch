@@ -316,6 +316,56 @@
   <!-- Tiny toast -->
   <div id="toast" class="toast hidden"></div>
 
+  <!-- ===== Free vs Pro Compare Modal (appears ~3s after load for Free users) ===== -->
+  <div id="compareModal" class="compare-modal hidden" role="dialog" aria-modal="true" aria-labelledby="cmpTitle">
+    <div class="compare-card" role="document">
+      <div class="cmp-topbar">
+        <div class="cmp-badge">PRO vs FREE</div>
+        <button id="cmpClose" class="cmp-close" aria-label="Close">×</button>
+      </div>
+
+      <div class="cmp-body">
+        <div class="cmp-hero">
+          <h2 id="cmpTitle">See the difference</h2>
+          <p class="muted">Pro unlocks higher quality, more styles, and faster downloads.</p>
+        </div>
+
+        <div class="cmp-grid">
+          <div class="cmp-col">
+            <span class="cmp-tag free">FREE</span>
+            <div class="cmp-thumb">
+              <img id="cmpFreeImg" alt="Free example" loading="lazy" />
+            </div>
+            <ul class="cmp-list">
+              <li>Clean black-and-white line drawing</li>
+              <li>Preview-size output</li>
+              <li>Daily generation limit</li>
+            </ul>
+          </div>
+
+          <div class="cmp-col">
+            <span class="cmp-tag pro">PRO</span>
+            <div class="cmp-thumb">
+              <img id="cmpProImg" alt="Pro example" loading="lazy" />
+            </div>
+            <ul class="cmp-list">
+              <li>Full color or line-art styles</li>
+              <li>Sticker cutline & transparent background</li>
+              <li>Hi-res PNG + SVG/PDF (print-ready)</li>
+              <li>Priority processing</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="cmp-cta">
+          <button id="cmpGoPro" class="btn-pro">Unlock Pro</button>
+          <button id="cmpMaybe" class="btn btn-ghost">Maybe later</button>
+          <button id="cmpDontShow" class="btn btn-ghost tiny" style="margin-left:auto">Don’t show again</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script>
     const boatUpload = document.getElementById("boatUpload");
@@ -351,6 +401,7 @@
 
     let currentMode = "image"; // "image" | "sticker"
     let isAuthed = false;
+    let currentPlan = "free"; // <-- track current plan for compare modal
 
     // --------------- helpers ---------------
     function showToast(msg) {
@@ -387,8 +438,10 @@
         userEmailEl.textContent = "";
       }
     }
+    // UPDATED: also store plan in state for the compare modal logic
     function setPlanBadge(plan) {
       const p = (plan || "free").toLowerCase();
+      currentPlan = p; // <-- keep plan in memory
       if (p === "pro") {
         planBadge.textContent = "PRO";
         planBadge.classList.add("pro");
@@ -491,6 +544,63 @@
     }
     limitGoPro?.addEventListener("click", goProCheckout);
 
+    // ===== Compare Modal logic =====
+    const compareModal = document.getElementById("compareModal");
+    const cmpClose = document.getElementById("cmpClose");
+    const cmpMaybe = document.getElementById("cmpMaybe");
+    const cmpGoPro = document.getElementById("cmpGoPro");
+    const cmpDontShow = document.getElementById("cmpDontShow");
+    const cmpFreeImg = document.getElementById("cmpFreeImg");
+    const cmpProImg  = document.getElementById("cmpProImg");
+
+    // Try .webp -> .png -> .jpg -> .jpeg automatically
+    function setImageWithFallback(imgEl, basePathNoExt) {
+      const exts = [".webp", ".png", ".jpg", ".jpeg"];
+      let i = 0;
+      function tryNext() {
+        if (i >= exts.length) return;
+        imgEl.onerror = () => { i++; tryNext(); };
+        imgEl.src = basePathNoExt + exts[i];
+      }
+      tryNext();
+    }
+
+    function openCompare() {
+      // load images on demand
+      setImageWithFallback(cmpFreeImg, "/images/FREEexample");
+      setImageWithFallback(cmpProImg,  "/images/PROexample");
+      compareModal.classList.remove("hidden");
+    }
+    function closeCompare() {
+      compareModal.classList.add("hidden");
+    }
+    function hideForDays(days = 14) {
+      const until = Date.now() + days*24*60*60*1000;
+      localStorage.setItem("cmp_hide_until", String(until));
+    }
+    function shouldShowCompare() {
+      // Don't show to Pro users
+      if (currentPlan === "pro") return false;
+      // Respect snooze
+      const t = Number(localStorage.getItem("cmp_hide_until") || 0);
+      if (Date.now() < t) return false;
+      // If other blocking modals are open, skip (auth/limit)
+      if (!authModal.classList.contains("hidden")) return false;
+      if (!limitModal.classList.contains("hidden")) return false;
+      return true;
+    }
+
+    // Events
+    cmpClose?.addEventListener("click", closeCompare);
+    cmpMaybe?.addEventListener("click", closeCompare);
+    compareModal?.addEventListener("click", (e) => { if (e.target === compareModal) closeCompare(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !compareModal.classList.contains("hidden")) closeCompare(); });
+    cmpDontShow?.addEventListener("click", () => { hideForDays(14); closeCompare(); });
+    cmpGoPro?.addEventListener("click", () => {
+      if (typeof goProCheckout === "function") goProCheckout();
+      else window.location.href = "/pricing.html";
+    });
+
     // --------------- Generate buttons ---------------
     btnImage.addEventListener("click", () => { currentMode = "image"; boatUpload.click(); });
     btnSticker.addEventListener("click", () => { currentMode = "sticker"; boatUpload.click(); });
@@ -558,17 +668,16 @@
 
             // Gate: if not signed in, blur + disable actions
             if (!isAuthed) {
-  gate.classList.remove("hidden");
-  downloadBtn.setAttribute("aria-disabled", "true");
-  downloadBtn.removeAttribute("href");
-  downloadBtn.removeAttribute("download");
-} else {
-  gate.classList.add("hidden");
-  downloadBtn.href = imageUrl;
-  downloadBtn.setAttribute("download", "boat-ai-design.png"); // <-- force download
-  downloadBtn.removeAttribute("aria-disabled");
-}
-
+              gate.classList.remove("hidden");
+              downloadBtn.setAttribute("aria-disabled", "true");
+              downloadBtn.removeAttribute("href");
+              downloadBtn.removeAttribute("download");
+            } else {
+              gate.classList.add("hidden");
+              downloadBtn.href = imageUrl;
+              downloadBtn.setAttribute("download", "boat-ai-design.png"); // <-- force download
+              downloadBtn.removeAttribute("aria-disabled");
+            }
 
           } else if (statusData.status === "failed") {
             statusArea.innerHTML = `<div class="card pad" style="border-color:#733;">Generation failed. Please try a different photo.</div>`;
@@ -590,8 +699,12 @@
       }
     });
 
-    // Kick off session + plan checks on load
-    checkSession().then(checkPlan);
+    // Kick off session + plan checks on load, then show compare modal after 3s if eligible
+    checkSession()
+      .then(checkPlan)
+      .then(() => {
+        setTimeout(() => { if (shouldShowCompare()) openCompare(); }, 3000);
+      });
 
     // If you redirect back after magic link verify with ?login=ok
     if (new URLSearchParams(location.search).get("login") === "ok") {
@@ -605,4 +718,3 @@
   </script>
 </body>
 </html>
-
