@@ -161,7 +161,6 @@ app.use((req, res, next) => {
   return express.json({ limit: "2mb" })(req, res, next);
 });
 
-
 app.get("/me/plan", async (req, res) => {
   try {
     const user = await getAuthedUser(req);
@@ -169,8 +168,6 @@ app.get("/me/plan", async (req, res) => {
     res.json({ plan });
   } catch { res.json({ plan: "free" }); }
 });
-
-
 
 // Health
 app.get("/healthz", async (_req, res) => {
@@ -520,10 +517,24 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     const mode = (req.body?.mode || "sticker").toLowerCase();
     const isSticker = mode === "sticker";
 
-    const prompt = isSticker
-  ? "Create a vibrant, vector-style illustration of the boat shown in the input image, preserving the boat’s ORIGINAL colors (hull, stripes/graphics, upholstery) and readable name/registration numbers. Simplify shapes, clean edges, and add subtle 2–3 tone cel-shading for depth. Add a thick white die-cut contour around the entire silhouette so it reads as a sticker. TRANSPARENT background. Include the entire boat with a small margin—no cropping. Remove all water, wake, reflections, and scenery. No extra elements or cast shadows outside the silhouette."
-  : "Create a clean, poster-style COLORED line illustration of the boat in the input image using the boat’s ORIGINAL color palette (hull/trim/decals). Use a thin dark outline with tasteful line-weight variation and minimal 1–2 tone shading for form. SOLID WHITE background. Show the entire boat with a small margin—no cropping. Exclude water, wake, reflections, people, and background scenery. No extra elements or effects.";
+    // === PLAN-AWARE PROMPTS ===
+    const plan = await getPlan(user?.id);
+    const isPro = plan === "pro";
 
+    // Pro: keep your current rich/color prompts
+    const PRO_STICKER_PROMPT =
+      "Create a vibrant, vector-style illustration of the boat shown in the input image, preserving the boat’s ORIGINAL colors (hull, stripes/graphics, upholstery) and readable name/registration numbers. Simplify shapes, clean edges, and add subtle 2–3 tone cel-shading for depth. Add a thick white die-cut contour around the entire silhouette so it reads as a sticker. TRANSPARENT background. Include the entire boat with a small margin—no cropping. Remove all water, wake, reflections, and scenery. No extra elements or cast shadows outside the silhouette.";
+
+    const PRO_IMAGE_PROMPT =
+      "Create a clean, poster-style COLORED line illustration of the boat in the input image using the boat’s ORIGINAL color palette (hull/trim/decals). Use a thin dark outline with tasteful line-weight variation and minimal 1–2 tone shading for form. SOLID WHITE background. Show the entire boat with a small margin—no cropping. Exclude water, wake, reflections, people, and background scenery. No extra elements or effects.";
+
+    // Free: black-and-white line drawing only (no color, no shading)
+    const FREE_PROMPT_BASE =
+      "Create a clean black-and-white line drawing of the boat in the input image. No color. Uniform thin black outline, no shading or gradients, no textures. Show the entire boat with a small margin — do not crop. Remove water, wake, reflections, people, and any background scenery. Do not add extra elements, decals, text, logos, or effects.";
+
+    const prompt = isPro
+      ? (isSticker ? PRO_STICKER_PROMPT : PRO_IMAGE_PROMPT)
+      : FREE_PROMPT_BASE;
 
     const backgroundSetting = isSticker ? "transparent" : "opaque";
 
@@ -543,7 +554,7 @@ app.post("/generate-image", upload.single("boatImage"), async (req, res) => {
     req.file.buffer = null;
 
     const kb = Math.round(pngBuffer.byteLength / 1024);
-    console.log(`[generate-image] mode=${mode} input ~${kb}KB`);
+    console.log(`[generate-image] plan=${plan} mode=${mode} input ~${kb}KB`);
 
     const dataUrl = `data:image/png;base64,${pngBuffer.toString("base64")}`;
 
@@ -778,8 +789,6 @@ app.post("/pro/checkout", async (req, res) => {
       mode: "subscription",
       line_items: [{ price: PRICE_ID, quantity: 1 }],
       allow_promotion_codes: true,
-      // ❌ remove customer_creation (only valid in payment mode)
-      // customer_creation: "if_required",
       ...(customerEmail ? { customer_email: customerEmail } : {}),
       success_url: `${(APP_ORIGIN || "").replace(/\/+$/,"")}/pricing.html?pro=ok`,
       cancel_url: `${(APP_ORIGIN || "").replace(/\/+$/,"")}/pricing.html`,
@@ -791,7 +800,6 @@ app.post("/pro/checkout", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 // Stripe: One-time Sticker Checkout Session (kept)
 app.post("/create-checkout-session", async (req, res) => {
@@ -978,11 +986,3 @@ async function start() {
 }
 
 start();
-
-
-
-
-
-
-
-
