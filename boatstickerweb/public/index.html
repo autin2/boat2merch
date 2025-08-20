@@ -570,9 +570,11 @@
       setImageWithFallback(cmpFreeImg, "/images/FREEexample");
       setImageWithFallback(cmpProImg,  "/images/PROexample");
       compareModal.classList.remove("hidden");
+       document.body.classList.add("modal-open");
     }
     function closeCompare() {
       compareModal.classList.add("hidden");
+      document.body.classList.remove("modal-open");
     }
     function hideForDays(days = 14) {
       const until = Date.now() + days*24*60*60*1000;
@@ -718,4 +720,5 @@
   </script>
 </body>
 </html>
+
 
